@@ -46,18 +46,24 @@ export default function MovingContractApp() {
         .split('.')[0] + 'Z'
     }
 
+    const icsDescription = [
+      `고객명: ${customerName || '-'}`,
+      `연락처: ${customerPhone || '-'}`,
+      `출발지: ${startAddress || '-'}`,
+      `도착지: ${endAddress || '-'}`,
+      `시작시간: ${startHour}시 ${startMinute}분`,
+    ].join('\n')
+
     const icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
+PRODID:-//Moving Contract App//KR
 BEGIN:VEVENT
-SUMMARY:${customerName || '고객'} 이사 일정
+SUMMARY:${customerName || '고객'} 이사 일정 ${customerPhone ? `(${customerPhone})` : ''}
 DTSTART:${formatDate(startDate)}
 DTEND:${formatDate(endDate)}
 LOCATION:${startAddress} → ${endAddress}
-DESCRIPTION:고객명: ${customerName || '-'}
-연락처: ${customerPhone || '-'}
-출발지: ${startAddress || '-'}
-도착지: ${endAddress || '-'}
-시작시간: ${startHour}시 ${startMinute}분
+CONTACT:${customerPhone || ''}
+DESCRIPTION:${icsDescription}
 END:VEVENT
 END:VCALENDAR`
 
@@ -70,6 +76,14 @@ END:VCALENDAR`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+  }
+
+  const handlePrint = () => {
+    document.title = `${customerName || '고객'}_이사계약서`
+
+    setTimeout(() => {
+      window.print()
+    }, 300)
   }
 
   const shareContract = async () => {
@@ -497,7 +511,7 @@ END:VCALENDAR`
         <section className="space-y-3 pt-2">
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={handlePrint}
             className="w-full bg-black text-white rounded-2xl py-4 font-semibold"
           >
             PDF 계약서 생성
