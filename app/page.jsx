@@ -39,7 +39,7 @@ export default function MovingContractApp() {
     const endDate = new Date(startDate)
     endDate.setHours(startDate.getHours() + 2)
 
-    const formatDate = (date: Date) => {
+    const formatDate = (date) => {
       return date
         .toISOString()
         .replace(/[-:]/g, '')
