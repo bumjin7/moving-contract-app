@@ -26,6 +26,38 @@ export default function MovingContractApp() {
   const [moveDate, setMoveDate] = useState('')
   const [startHour, setStartHour] = useState('08')
   const [startMinute, setStartMinute] = useState('00')
+  const [stopover, setStopover] = useState('')
+  const [moveTypes, setMoveTypes] = useState([])
+  const [storageDays, setStorageDays] = useState('1일')
+  const [houseTypes, setHouseTypes] = useState([])
+  const [workVolume, setWorkVolume] = useState('1톤')
+  const [startCarryMethod, setStartCarryMethod] = useState('사다리차')
+  const [startFloor, setStartFloor] = useState('1층')
+  const [endCarryMethod, setEndCarryMethod] = useState('사다리차')
+  const [endFloor, setEndFloor] = useState('1층')
+  const [maleWorkers, setMaleWorkers] = useState('0명')
+  const [femaleWorkers, setFemaleWorkers] = useState('0명')
+  const [optionItems, setOptionItems] = useState([
+    { name: '없음', price: '없음' },
+    { name: '없음', price: '없음' },
+    { name: '없음', price: '없음' },
+    { name: '없음', price: '없음' },
+  ])
+  const [customerMemo, setCustomerMemo] = useState('')
+  const [excludedItems, setExcludedItems] = useState('')
+  const [etcMemo, setEtcMemo] = useState('')
+
+  const toggleValue = (value, setter) => {
+    setter((prev) =>
+      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
+    )
+  }
+
+  const updateOptionItem = (index, field, value) => {
+    setOptionItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    )
+  }
 
   const downloadICS = () => {
     if (!moveDate) {
@@ -46,12 +78,52 @@ export default function MovingContractApp() {
         .split('.')[0] + 'Z'
     }
 
+    const visibleOptions = optionItems
+      .slice(0, optionCount)
+      .map((option, index) => `옵션 ${index + 1}: ${option.name || '없음'} / ${option.price || '없음'}`)
+      .join('\n')
+
     const icsDescription = [
+      '【고객 정보】',
       `고객명: ${customerName || '-'}`,
       `연락처: ${customerPhone || '-'}`,
-      `출발지: ${startAddress || '-'}`,
-      `도착지: ${endAddress || '-'}`,
+      '',
+      '【주소 및 일정】',
+      `출발지 주소: ${startAddress || '-'}`,
+      `도착지 주소: ${endAddress || '-'}`,
+      `포장일: ${packingDate || '-'}`,
+      `운반일: ${moveDate || '-'}`,
       `시작시간: ${startHour}시 ${startMinute}분`,
+      `경유지: ${stopover || '-'}`,
+      '',
+      '【계약 상품】',
+      `계약 상품: ${moveTypes.length ? moveTypes.join(', ') : '-'}`,
+      `보관 기간: ${moveTypes.includes('보관이사') ? storageDays : '-'}`,
+      `주거 형태: ${houseTypes.length ? houseTypes.join(', ') : '-'}`,
+      `작업 용량: ${workVolume}`,
+      `출발지 운반수단: ${startCarryMethod} / ${startFloor}`,
+      `도착지 운반수단: ${endCarryMethod} / ${endFloor}`,
+      `남 작업인원: ${maleWorkers}`,
+      `여 작업인원: ${femaleWorkers}`,
+      '',
+      '【옵션 및 추가비용】',
+      visibleOptions || '-',
+      '',
+      '【견적 금액】',
+      `기본 이사비용: ${baseCost || 0}만원`,
+      `옵션 비용: ${optionCost || 0}만원`,
+      `사다리차 비용: ${ladderCost || 0}만원`,
+      `총 견적 금액: ${totalCost}만원`,
+      `계약금: ${depositCost || 0}만원`,
+      `잔금: ${balanceCost}만원`,
+      '',
+      '【견적 금액】',
+      `기본 이사비용: ${baseCost || 0}만원`,
+      `옵션 비용: ${optionCost || 0}만원`,
+      `사다리차 비용: ${ladderCost || 0}만원`,
+      `총 견적 금액: ${totalCost}만원`,
+      `계약금: ${depositCost || 0}만원`,
+      `잔금: ${balanceCost}만원`,
     ].join('\n')
 
     const icsContent = `BEGIN:VCALENDAR
@@ -212,7 +284,12 @@ END:VCALENDAR`
 
             <div>
               <label className="text-base font-semibold text-gray-950">경유지</label>
-              <input className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white" placeholder="경유지" />
+              <input
+                value={stopover}
+                onChange={(e) => setStopover(e.target.value)}
+                className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
+                placeholder="경유지"
+              />
             </div>
           </div>
         </section>
@@ -222,16 +299,20 @@ END:VCALENDAR`
           <h2 className="text-xl font-bold border-b border-gray-400 pb-2 text-gray-950">계약 상품</h2>
 
           <div className="grid grid-cols-2 gap-3 text-base font-semibold text-gray-950">
-            <label><input type="checkbox" /> 포장이사</label>
-            <label><input type="checkbox" /> 일반이사</label>
+            <label><input type="checkbox" onChange={() => toggleValue('포장이사', setMoveTypes)} /> 포장이사</label>
+            <label><input type="checkbox" onChange={() => toggleValue('일반이사', setMoveTypes)} /> 일반이사</label>
 
-            <label><input type="checkbox" /> 반포장이사</label>
-            <label><input type="checkbox" /> 사무실이사</label>
+            <label><input type="checkbox" onChange={() => toggleValue('반포장이사', setMoveTypes)} /> 반포장이사</label>
+            <label><input type="checkbox" onChange={() => toggleValue('사무실이사', setMoveTypes)} /> 사무실이사</label>
 
             <div className="flex items-center gap-2 col-span-2 flex-wrap">
-              <label><input type="checkbox" /> 보관이사</label>
+              <label><input type="checkbox" onChange={() => toggleValue('보관이사', setMoveTypes)} /> 보관이사</label>
 
-              <select className="border border-gray-400 rounded-xl p-2 text-base font-semibold text-gray-950 bg-white">
+              <select
+                value={storageDays}
+                onChange={(e) => setStorageDays(e.target.value)}
+                className="border border-gray-400 rounded-xl p-2 text-base font-semibold text-gray-950 bg-white"
+              >
                 {Array.from({ length: 365 }, (_, i) => (
                   <option key={i + 1}>{i + 1}일</option>
                 ))}
@@ -241,16 +322,20 @@ END:VCALENDAR`
 
           <h3 className="font-medium">주거 형태</h3>
           <div className="grid grid-cols-2 gap-3 text-base font-semibold text-gray-950">
-            <label><input type="checkbox" /> 아파트</label>
-            <label><input type="checkbox" /> 빌라</label>
-            <label><input type="checkbox" /> 오피스텔/원룸</label>
-            <label><input type="checkbox" /> 다세대/단독</label>
-            <label><input type="checkbox" /> 상가</label>
+            <label><input type="checkbox" onChange={() => toggleValue('아파트', setHouseTypes)} /> 아파트</label>
+            <label><input type="checkbox" onChange={() => toggleValue('빌라', setHouseTypes)} /> 빌라</label>
+            <label><input type="checkbox" onChange={() => toggleValue('오피스텔/원룸', setHouseTypes)} /> 오피스텔/원룸</label>
+            <label><input type="checkbox" onChange={() => toggleValue('다세대/단독', setHouseTypes)} /> 다세대/단독</label>
+            <label><input type="checkbox" onChange={() => toggleValue('상가', setHouseTypes)} /> 상가</label>
           </div>
 
           <div>
             <label className="text-base font-semibold text-gray-950 block mb-1">작업 용량</label>
-            <select className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white">
+            <select
+              value={workVolume}
+              onChange={(e) => setWorkVolume(e.target.value)}
+              className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
+            >
               <option>1톤</option>
               <option>2.5톤</option>
               <option>5톤</option>
@@ -265,13 +350,21 @@ END:VCALENDAR`
               <label className="text-base font-semibold text-gray-950 block mb-1">출발지 운반수단</label>
 
               <div className="grid grid-cols-2 gap-2">
-                <select className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white">
+                <select
+                  value={startCarryMethod}
+                  onChange={(e) => setStartCarryMethod(e.target.value)}
+                  className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
+                >
                   <option>사다리차</option>
                   <option>엘레베이터</option>
                   <option>계단작업</option>
                 </select>
 
-                <select className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white">
+                <select
+                  value={startFloor}
+                  onChange={(e) => setStartFloor(e.target.value)}
+                  className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
+                >
                   {Array.from({ length: 100 }, (_, i) => (
                     <option key={i + 1}>{i + 1}층</option>
                   ))}
@@ -283,13 +376,21 @@ END:VCALENDAR`
               <label className="text-base font-semibold text-gray-950 block mb-1">도착지 운반수단</label>
 
               <div className="grid grid-cols-2 gap-2">
-                <select className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white">
+                <select
+                  value={endCarryMethod}
+                  onChange={(e) => setEndCarryMethod(e.target.value)}
+                  className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
+                >
                   <option>사다리차</option>
                   <option>엘레베이터</option>
                   <option>계단작업</option>
                 </select>
 
-                <select className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white">
+                <select
+                  value={endFloor}
+                  onChange={(e) => setEndFloor(e.target.value)}
+                  className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
+                >
                   {Array.from({ length: 100 }, (_, i) => (
                     <option key={i + 1}>{i + 1}층</option>
                   ))}
@@ -301,7 +402,11 @@ END:VCALENDAR`
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-base font-semibold text-gray-950 block mb-1">남 작업인원</label>
-              <select className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white">
+              <select
+                value={maleWorkers}
+                onChange={(e) => setMaleWorkers(e.target.value)}
+                className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
+              >
                 {Array.from({ length: 11 }, (_, i) => (
                   <option key={i}>{i}명</option>
                 ))}
@@ -310,7 +415,11 @@ END:VCALENDAR`
 
             <div>
               <label className="text-base font-semibold text-gray-950 block mb-1">여 작업인원</label>
-              <select className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white">
+              <select
+                value={femaleWorkers}
+                onChange={(e) => setFemaleWorkers(e.target.value)}
+                className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
+              >
                 {Array.from({ length: 11 }, (_, i) => (
                   <option key={i}>{i}명</option>
                 ))}
