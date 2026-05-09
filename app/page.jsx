@@ -1,8 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
 
 export default function MovingContractApp() {
+  const contractRef = useRef(null)
   const [baseCost, setBaseCost] = useState('')
   const [optionCost, setOptionCost] = useState('')
   const [ladderCost, setLadderCost] = useState('')
@@ -20,6 +23,20 @@ export default function MovingContractApp() {
   const [optionCount, setOptionCount] = useState(1)
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
+
+  const formatPhoneNumber = (value) => {
+    const numbers = value.replace(/\D/g, '').slice(0, 11)
+
+    if (numbers.length < 4) {
+      return numbers
+    }
+
+    if (numbers.length < 8) {
+      return `${numbers.slice(0, 3)}-${numbers.slice(3)}`
+    }
+
+    return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`
+  }
   const [startAddress, setStartAddress] = useState('')
   const [endAddress, setEndAddress] = useState('')
   const [packingDate, setPackingDate] = useState('')
@@ -150,20 +167,102 @@ END:VCALENDAR`
     document.body.removeChild(link)
   }
 
-  const handlePrint = () => {
-    document.title = `${customerName || '고객'}_이사계약서`
+  const handleImageDownload = async () => {
+    if (!contractRef.current) return
 
-    setTimeout(() => {
-      window.print()
-    }, 300)
+    const canvas = await html2canvas(contractRef.current, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+    })
+
+    const image = canvas.toDataURL('image/png')
+
+    const link = document.createElement('a')
+    link.href = image
+    link.download = `${customerName || '고객'}_이사계약서.png`
+    link.click()
+  }
+
+  const handlePdfDownload = async () => {
+    if (!contractRef.current) return
+
+    const canvas = await html2canvas(contractRef.current, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+    })
+
+    const imgData = canvas.toDataURL('image/png')
+    const pdf = new jsPDF('p', 'mm', 'a4')
+
+    const pageWidth = 210
+    const pageHeight = 297
+    const imgWidth = pageWidth
+    const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+    let heightLeft = imgHeight
+    let position = 0
+
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+    heightLeft -= pageHeight
+
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight
+      pdf.addPage()
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+    }
+
+    pdf.save(`${customerName || '고객'}_이사계약서.pdf`)
   }
 
   const shareContract = async () => {
+    const visibleOptions = optionItems
+      .slice(0, optionCount)
+      .filter((option) => option.name !== '없음' || option.price !== '없음')
+      .map((option, index) => `옵션 ${index + 1}: ${option.name} / ${option.price}`)
+      .join('\n')
+
     const shareText = `이사 견적 계약 안내
+
+【고객 정보】
+고객명: ${customerName || '-'}
+연락처: ${customerPhone || '-'}
+
+【주소】
+출발지: ${startAddress || '-'}
+도착지: ${endAddress || '-'}
+경유지: ${stopover || '-'}
+
+【이사 일정】
+포장일: ${packingDate || '-'}
+운반일: ${moveDate || '-'}
+시작시간: ${startHour}시 ${startMinute}분
+
+【계약 정보】
+계약상품: ${moveTypes.length ? moveTypes.join(', ') : '-'}
+보관기간: ${moveTypes.includes('보관이사') ? storageDays : '-'}
+작업용량: ${workVolume}
+출발지 운반수단: ${startCarryMethod} / ${startFloor}
+도착지 운반수단: ${endCarryMethod} / ${endFloor}
+작업인원: 남 ${maleWorkers}, 여 ${femaleWorkers}
+
+【옵션】
+${visibleOptions || '-'}
+
+【견적 금액】
 총 견적금액: ${totalCost}만원
 계약금: ${depositCost || 0}만원
 잔금: ${balanceCost}만원
-입금계좌: ${bankName} ${accountNumber} (예금주: ${accountHolder})`
+
+【입금 계좌】
+${bankName} ${accountNumber} (예금주: ${accountHolder})
+
+【비고 및 요청사항】
+고객 요청 및 주의사항: ${customerMemo || '-'}
+견적 제외 품목: ${excludedItems || '-'}
+기타 메모: ${etcMemo || '-'}`
 
     if (navigator.share) {
       await navigator.share({
@@ -172,13 +271,13 @@ END:VCALENDAR`
       })
     } else {
       await navigator.clipboard.writeText(shareText)
-      alert('계좌정보가 포함된 계약 안내문이 복사되었습니다. 카카오톡에 붙여넣어 주세요.')
+      alert('계약 안내문이 복사되었습니다. 카카오톡에 붙여넣어 주세요.')
     }
   }
 
   return (
     <div className="min-h-screen bg-gray-100 p-3 text-gray-950 antialiased">
-      <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg p-4 space-y-6">
+      <div ref={contractRef} className="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg p-4 space-y-6">
         <h1 className="text-3xl font-extrabold text-center text-gray-950">이사 견적 · 계약서</h1>
 
         {/* 고객 정보 */}
@@ -199,10 +298,12 @@ END:VCALENDAR`
             <div>
               <label className="text-base font-semibold text-gray-950">연락처</label>
               <input
+                type="tel"
+                inputMode="numeric"
                 value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
+                onChange={(e) => setCustomerPhone(formatPhoneNumber(e.target.value))}
                 className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-                placeholder="연락처"
+                placeholder="010-0000-0000"
               />
             </div>
           </div>
@@ -439,7 +540,11 @@ END:VCALENDAR`
               <label className="text-base font-semibold text-gray-950 block mb-1">옵션 {num}</label>
 
               <div className="grid grid-cols-2 gap-2">
-                <select defaultValue="없음" className="border border-gray-400 rounded-xl p-3 w-full text-base font-semibold text-gray-950 bg-white">
+                <select
+                  value={optionItems[num - 1].name}
+                  onChange={(e) => updateOptionItem(num - 1, 'name', e.target.value)}
+                  className="border border-gray-400 rounded-xl p-3 w-full text-base font-semibold text-gray-950 bg-white"
+                >
                   <option>없음</option>
                   <option>벽걸이 TV</option>
                   <option>돌침대</option>
@@ -452,7 +557,11 @@ END:VCALENDAR`
                   <option>기타</option>
                 </select>
 
-                <select defaultValue="없음" className="border border-gray-400 rounded-xl p-3 w-full text-base font-semibold text-gray-950 bg-white">
+                <select
+                  value={optionItems[num - 1].price}
+                  onChange={(e) => updateOptionItem(num - 1, 'price', e.target.value)}
+                  className="border border-gray-400 rounded-xl p-3 w-full text-base font-semibold text-gray-950 bg-white"
+                >
                   <option>없음</option>
                   {Array.from({ length: 100 }, (_, i) => (
                     <option key={i + 1}>{i + 1}만원</option>
@@ -602,17 +711,32 @@ END:VCALENDAR`
 
           <div>
             <label className="text-base font-semibold text-gray-950 block mb-1">고객 요청 및 주의사항</label>
-            <textarea className="w-full border rounded-xl p-3 h-24" placeholder="고객 요청 및 주의사항" />
+            <textarea
+              value={customerMemo}
+              onChange={(e) => setCustomerMemo(e.target.value)}
+              className="w-full border rounded-xl p-3 h-24"
+              placeholder="고객 요청 및 주의사항"
+            />
           </div>
 
           <div>
             <label className="text-base font-semibold text-gray-950 block mb-1">견적 제외 품목</label>
-            <textarea className="w-full border rounded-xl p-3 h-24" placeholder="견적 제외 품목" />
+            <textarea
+              value={excludedItems}
+              onChange={(e) => setExcludedItems(e.target.value)}
+              className="w-full border rounded-xl p-3 h-24"
+              placeholder="견적 제외 품목"
+            />
           </div>
 
           <div>
             <label className="text-base font-semibold text-gray-950 block mb-1">기타 메모</label>
-            <textarea className="w-full border rounded-xl p-3 h-24" placeholder="기타 메모" />
+            <textarea
+              value={etcMemo}
+              onChange={(e) => setEtcMemo(e.target.value)}
+              className="w-full border rounded-xl p-3 h-24"
+              placeholder="기타 메모"
+            />
           </div>
         </section>
 
@@ -620,10 +744,18 @@ END:VCALENDAR`
         <section className="space-y-3 pt-2">
           <button
             type="button"
-            onClick={handlePrint}
+            onClick={handlePdfDownload}
             className="w-full bg-black text-white rounded-2xl py-4 font-semibold"
           >
             PDF 계약서 생성
+          </button>
+
+          <button
+            type="button"
+            onClick={handleImageDownload}
+            className="w-full bg-green-600 text-white rounded-2xl py-4 font-semibold"
+          >
+            이미지 저장 (PNG)
           </button>
 
           <button
