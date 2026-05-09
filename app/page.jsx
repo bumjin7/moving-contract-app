@@ -4,39 +4,197 @@ import { useRef, useState } from 'react'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 
+export const phoneFormatTestCases = [
+  { input: '01012341234', expected: '010-1234-1234' },
+  { input: '010-1234-1234', expected: '010-1234-1234' },
+  { input: '010abc1234', expected: '010-1234' },
+  { input: '0101234', expected: '010-1234' },
+  { input: '010123456789', expected: '010-1234-5678' },
+]
+
+export const icsEscapeTestCases = [
+  { input: '서울, 경기; 메모', expected: '서울\\, 경기\\; 메모' },
+  { input: '1층\\2층', expected: '1층\\\\2층' },
+  { input: '첫줄\n둘째줄', expected: '첫줄\\n둘째줄' },
+]
+
+function formatPhoneNumber(value) {
+  const numbers = String(value || '').replace(/\D/g, '').slice(0, 11)
+
+  if (numbers.length < 4) return numbers
+  if (numbers.length < 8) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`
+  return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`
+}
+
+function createIcsDate(date) {
+  return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+}
+
+function escapeIcsText(text) {
+  return String(text || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\n/g, '\\n')
+}
+
+function downloadTextFile(filename, content, type) {
+  const blob = new Blob([content], { type })
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
+}
+
+async function copyTextFallback(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    // textarea fallback below
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.left = '-9999px'
+  document.body.appendChild(textarea)
+  textarea.select()
+
+  let copied = false
+  try {
+    copied = document.execCommand('copy')
+  } catch {
+    copied = false
+  }
+
+  document.body.removeChild(textarea)
+  return copied
+}
+
+function Field({ label, children }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={{ color: '#111827', fontSize: 16, fontWeight: 700 }}>{label}</label>
+      {children}
+    </div>
+  )
+}
+
+const styles = {
+  page: {
+    minHeight: '100vh',
+    background: '#f3f4f6',
+    padding: 12,
+    color: '#111827',
+    fontFamily: 'Arial, sans-serif',
+  },
+  card: {
+    maxWidth: 672,
+    margin: '0 auto',
+    background: '#ffffff',
+    borderRadius: 16,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+    padding: 16,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 24,
+    color: '#111827',
+  },
+  section: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+  },
+  title: {
+    fontSize: 30,
+    fontWeight: 900,
+    textAlign: 'center',
+    color: '#111827',
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 800,
+    borderBottom: '1px solid #9ca3af',
+    paddingBottom: 8,
+    color: '#111827',
+  },
+  grid2: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 12,
+  },
+  grid2Small: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 8,
+  },
+  input: {
+    width: '100%',
+    border: '1px solid #9ca3af',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    fontWeight: 700,
+    color: '#111827',
+    background: '#ffffff',
+    boxSizing: 'border-box',
+  },
+  textarea: {
+    width: '100%',
+    border: '1px solid #9ca3af',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    fontWeight: 700,
+    color: '#111827',
+    background: '#ffffff',
+    height: 96,
+    boxSizing: 'border-box',
+  },
+  button: {
+    width: '100%',
+    border: 'none',
+    borderRadius: 16,
+    padding: '16px 12px',
+    fontSize: 16,
+    fontWeight: 800,
+    cursor: 'pointer',
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#6b7280',
+    borderTop: '1px solid #d1d5db',
+    paddingTop: 16,
+    lineHeight: 1.8,
+  },
+}
+
+const optionNames = ['없음', '벽걸이 TV', '돌침대', '조립장농', '피아노', '날짜옵션', '이동거리', '이사작업지연', '보관비용', '기타']
+
 export default function MovingContractApp() {
   const contractRef = useRef(null)
-  const [baseCost, setBaseCost] = useState('')
-  const [optionCost, setOptionCost] = useState('')
-  const [ladderCost, setLadderCost] = useState('')
-  const [depositCost, setDepositCost] = useState('')
+
   const bankName = '농협'
   const accountNumber = '352-1025-5721-13'
   const accountHolder = '윤도근'
 
-  const totalCost =
-    (Number(baseCost) || 0) +
-    (Number(optionCost) || 0) +
-    (Number(ladderCost) || 0)
-
-  const balanceCost = totalCost - (Number(depositCost) || 0)
+  const [baseCost, setBaseCost] = useState('')
+  const [optionCost, setOptionCost] = useState('')
+  const [ladderCost, setLadderCost] = useState('')
+  const [depositCost, setDepositCost] = useState('')
   const [optionCount, setOptionCount] = useState(1)
+
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
-
-  const formatPhoneNumber = (value) => {
-    const numbers = value.replace(/\D/g, '').slice(0, 11)
-
-    if (numbers.length < 4) {
-      return numbers
-    }
-
-    if (numbers.length < 8) {
-      return `${numbers.slice(0, 3)}-${numbers.slice(3)}`
-    }
-
-    return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`
-  }
   const [startAddress, setStartAddress] = useState('')
   const [endAddress, setEndAddress] = useState('')
   const [packingDate, setPackingDate] = useState('')
@@ -44,6 +202,7 @@ export default function MovingContractApp() {
   const [startHour, setStartHour] = useState('08')
   const [startMinute, setStartMinute] = useState('00')
   const [stopover, setStopover] = useState('')
+
   const [moveTypes, setMoveTypes] = useState([])
   const [storageDays, setStorageDays] = useState('1일')
   const [houseTypes, setHouseTypes] = useState([])
@@ -54,177 +213,43 @@ export default function MovingContractApp() {
   const [endFloor, setEndFloor] = useState('1층')
   const [maleWorkers, setMaleWorkers] = useState('0명')
   const [femaleWorkers, setFemaleWorkers] = useState('0명')
+
   const [optionItems, setOptionItems] = useState([
     { name: '없음', price: '없음' },
     { name: '없음', price: '없음' },
     { name: '없음', price: '없음' },
     { name: '없음', price: '없음' },
   ])
+
   const [customerMemo, setCustomerMemo] = useState('')
   const [excludedItems, setExcludedItems] = useState('')
   const [etcMemo, setEtcMemo] = useState('')
+  const [shareStatus, setShareStatus] = useState('')
+  const [pdfStatus, setPdfStatus] = useState('')
+
+  const totalCost = (Number(baseCost) || 0) + (Number(optionCost) || 0) + (Number(ladderCost) || 0)
+  const balanceCost = totalCost - (Number(depositCost) || 0)
 
   const toggleValue = (value, setter) => {
-    setter((prev) =>
-      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
-    )
+    setter((prev) => (prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]))
   }
 
   const updateOptionItem = (index, field, value) => {
-    setOptionItems((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
-    )
+    setOptionItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)))
   }
 
-  const downloadICS = () => {
-    if (!moveDate) {
-      alert('운반일을 선택해 주세요.')
-      return
-    }
-
-    const startDate = new Date(moveDate)
-    startDate.setHours(Number(startHour), Number(startMinute), 0)
-
-    const endDate = new Date(startDate)
-    endDate.setHours(startDate.getHours() + 2)
-
-    const formatDate = (date) => {
-      return date
-        .toISOString()
-        .replace(/[-:]/g, '')
-        .split('.')[0] + 'Z'
-    }
-
-    const visibleOptions = optionItems
+  const getVisibleOptionsText = (onlySelected = false) => {
+    return optionItems
       .slice(0, optionCount)
+      .filter((option) => !onlySelected || option.name !== '없음' || option.price !== '없음')
       .map((option, index) => `옵션 ${index + 1}: ${option.name || '없음'} / ${option.price || '없음'}`)
       .join('\n')
-
-    const icsEscape = (text) => {
-      return String(text)
-        .replace(/\\/g, '\\\\')
-        .replace(/;/g, '\\;')
-        .replace(/,/g, '\\,')
-        .replace(/\n/g, '\\n')
-    }
-
-    const icsDescription = [
-      '【고객 정보】',
-      `고객명: ${customerName || '-'}`,
-      `연락처: ${customerPhone || '-'}`,
-      '',
-      '【주소 및 일정】',
-      `출발지 주소: ${startAddress || '-'}`,
-      `도착지 주소: ${endAddress || '-'}`,
-      `포장일: ${packingDate || '-'}`,
-      `운반일: ${moveDate || '-'}`,
-      `시작시간: ${startHour}시 ${startMinute}분`,
-      `경유지: ${stopover || '-'}`,
-      '',
-      '【계약 상품】',
-      `계약 상품: ${moveTypes.length ? moveTypes.join(', ') : '-'}`,
-      `보관 기간: ${moveTypes.includes('보관이사') ? storageDays : '-'}`,
-      `주거 형태: ${houseTypes.length ? houseTypes.join(', ') : '-'}`,
-      `작업 용량: ${workVolume}`,
-      `출발지 운반수단: ${startCarryMethod} / ${startFloor}`,
-      `도착지 운반수단: ${endCarryMethod} / ${endFloor}`,
-      `남 작업인원: ${maleWorkers}`,
-      `여 작업인원: ${femaleWorkers}`,
-      '',
-      '【옵션 및 추가비용】',
-      visibleOptions || '-',
-      '',
-      '【견적 금액】',
-      `기본 이사비용: ${baseCost || 0}만원`,
-      `옵션 비용: ${optionCost || 0}만원`,
-      `사다리차 비용: ${ladderCost || 0}만원`,
-      `총 견적 금액: ${totalCost}만원`,
-      `계약금: ${depositCost || 0}만원`,
-      `잔금: ${balanceCost}만원`,
-    ].join('\n')
-
-    const icsContent = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//Moving Contract App//KR
-BEGIN:VEVENT
-SUMMARY:${icsEscape(`${customerName || '고객'} 이사 일정 ${customerPhone ? `(${customerPhone})` : ''}`)}
-DTSTART:${formatDate(startDate)}
-DTEND:${formatDate(endDate)}
-LOCATION:${icsEscape(`${startAddress} → ${endAddress}`)}
-CONTACT:${icsEscape(customerPhone || '')}
-DESCRIPTION:${icsEscape(icsDescription)}
-END:VEVENT
-END:VCALENDAR`
-
-    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' })
-    const url = window.URL.createObjectURL(blob)
-
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', `${customerName || '이사일정'}.ics`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
   }
 
-  const handleImageDownload = async () => {
-    if (!contractRef.current) return
+  const buildContractText = () => {
+    const visibleOptions = getVisibleOptionsText(true)
 
-    const canvas = await html2canvas(contractRef.current, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-    })
-
-    const image = canvas.toDataURL('image/png')
-
-    const link = document.createElement('a')
-    link.href = image
-    link.download = `${customerName || '고객'}_이사계약서.png`
-    link.click()
-  }
-
-  const handlePdfDownload = async () => {
-    if (!contractRef.current) return
-
-    const canvas = await html2canvas(contractRef.current, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-    })
-
-    const imgData = canvas.toDataURL('image/png')
-    const pdf = new jsPDF('p', 'mm', 'a4')
-
-    const pageWidth = 210
-    const pageHeight = 297
-    const imgWidth = pageWidth
-    const imgHeight = (canvas.height * imgWidth) / canvas.width
-
-    let heightLeft = imgHeight
-    let position = 0
-
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-    heightLeft -= pageHeight
-
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight
-      pdf.addPage()
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight
-    }
-
-    pdf.save(`${customerName || '고객'}_이사계약서.pdf`)
-  }
-
-  const shareContract = async () => {
-    const visibleOptions = optionItems
-      .slice(0, optionCount)
-      .filter((option) => option.name !== '없음' || option.price !== '없음')
-      .map((option, index) => `옵션 ${index + 1}: ${option.name} / ${option.price}`)
-      .join('\n')
-
-    const shareText = `이사 견적 계약 안내
+    return `이사 견적 계약 안내
 
 【고객 정보】
 고객명: ${customerName || '-'}
@@ -252,6 +277,9 @@ END:VCALENDAR`
 ${visibleOptions || '-'}
 
 【견적 금액】
+기본 이사비용: ${baseCost || 0}만원
+옵션 비용: ${optionCost || 0}만원
+사다리차 비용: ${ladderCost || 0}만원
 총 견적금액: ${totalCost}만원
 계약금: ${depositCost || 0}만원
 잔금: ${balanceCost}만원
@@ -263,166 +291,255 @@ ${bankName} ${accountNumber} (예금주: ${accountHolder})
 고객 요청 및 주의사항: ${customerMemo || '-'}
 견적 제외 품목: ${excludedItems || '-'}
 기타 메모: ${etcMemo || '-'}`
+  }
 
-    if (navigator.share) {
-      await navigator.share({
-        title: '이사 견적 계약 안내',
-        text: shareText,
+  const downloadICS = () => {
+    if (!moveDate) {
+      alert('운반일을 선택해 주세요.')
+      return
+    }
+
+    const startDate = new Date(moveDate)
+    startDate.setHours(Number(startHour), Number(startMinute), 0)
+
+    const endDate = new Date(startDate)
+    endDate.setHours(startDate.getHours() + 2)
+
+    const icsDescription = [
+      '【고객 정보】',
+      `고객명: ${customerName || '-'}`,
+      `연락처: ${customerPhone || '-'}`,
+      '',
+      '【주소 및 일정】',
+      `출발지 주소: ${startAddress || '-'}`,
+      `도착지 주소: ${endAddress || '-'}`,
+      `포장일: ${packingDate || '-'}`,
+      `운반일: ${moveDate || '-'}`,
+      `시작시간: ${startHour}시 ${startMinute}분`,
+      `경유지: ${stopover || '-'}`,
+      '',
+      '【계약 상품】',
+      `계약 상품: ${moveTypes.length ? moveTypes.join(', ') : '-'}`,
+      `보관 기간: ${moveTypes.includes('보관이사') ? storageDays : '-'}`,
+      `주거 형태: ${houseTypes.length ? houseTypes.join(', ') : '-'}`,
+      `작업 용량: ${workVolume}`,
+      `출발지 운반수단: ${startCarryMethod} / ${startFloor}`,
+      `도착지 운반수단: ${endCarryMethod} / ${endFloor}`,
+      `남 작업인원: ${maleWorkers}`,
+      `여 작업인원: ${femaleWorkers}`,
+      '',
+      '【옵션 및 추가비용】',
+      getVisibleOptionsText() || '-',
+      '',
+      '【견적 금액】',
+      `기본 이사비용: ${baseCost || 0}만원`,
+      `옵션 비용: ${optionCost || 0}만원`,
+      `사다리차 비용: ${ladderCost || 0}만원`,
+      `총 견적 금액: ${totalCost}만원`,
+      `계약금: ${depositCost || 0}만원`,
+      `잔금: ${balanceCost}만원`,
+    ].join('\n')
+
+    const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Moving Contract App//KR
+BEGIN:VEVENT
+SUMMARY:${escapeIcsText(`${customerName || '고객'} 이사 일정 ${customerPhone ? `(${customerPhone})` : ''}`)}
+DTSTART:${createIcsDate(startDate)}
+DTEND:${createIcsDate(endDate)}
+LOCATION:${escapeIcsText(`${startAddress} → ${endAddress}`)}
+CONTACT:${escapeIcsText(customerPhone || '')}
+DESCRIPTION:${escapeIcsText(icsDescription)}
+END:VEVENT
+END:VCALENDAR`
+
+    downloadTextFile(`${customerName || '이사일정'}.ics`, icsContent, 'text/calendar;charset=utf-8')
+  }
+
+  const prepareCaptureElement = () => {
+    if (!contractRef.current) return null
+
+    const clone = contractRef.current.cloneNode(true)
+    clone.querySelectorAll('[data-capture-ignore="true"]').forEach((el) => el.remove())
+    clone.querySelectorAll('*').forEach((el) => {
+      el.style.color = '#111827'
+      el.style.borderColor = '#9ca3af'
+      el.style.backgroundColor = el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' ? '#ffffff' : '#ffffff'
+      el.style.boxShadow = 'none'
+    })
+
+    clone.style.position = 'fixed'
+    clone.style.left = '-10000px'
+    clone.style.top = '0'
+    clone.style.width = `${contractRef.current.offsetWidth}px`
+    clone.style.backgroundColor = '#ffffff'
+    clone.style.color = '#111827'
+    clone.style.boxShadow = 'none'
+    document.body.appendChild(clone)
+    return clone
+  }
+
+  const handleImageDownload = async () => {
+    setPdfStatus('이미지 생성 중입니다. 잠시만 기다려 주세요.')
+    let captureTarget = null
+
+    try {
+      captureTarget = prepareCaptureElement()
+      if (!captureTarget) return
+
+      const canvas = await html2canvas(captureTarget, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
       })
-    } else {
-      await navigator.clipboard.writeText(shareText)
-      alert('계약 안내문이 복사되었습니다. 카카오톡에 붙여넣어 주세요.')
+
+      const image = canvas.toDataURL('image/png')
+      const link = document.createElement('a')
+      link.href = image
+      link.download = `${customerName || '고객'}_이사계약서.png`
+      link.click()
+      setPdfStatus('이미지 파일이 생성되었습니다.')
+    } catch (error) {
+      console.error('이미지 생성 오류:', error)
+      setPdfStatus('이미지 생성에 실패했습니다. 새로고침 후 다시 시도해 주세요.')
+    } finally {
+      if (captureTarget) captureTarget.remove()
     }
   }
 
+  const handlePdfDownload = async () => {
+    setPdfStatus('PDF 생성 중입니다. 잠시만 기다려 주세요.')
+    let captureTarget = null
+
+    try {
+      if (document.fonts?.ready) await document.fonts.ready
+      captureTarget = prepareCaptureElement()
+      if (!captureTarget) {
+        setPdfStatus('PDF로 저장할 계약서 영역을 찾지 못했습니다.')
+        return
+      }
+
+      const canvas = await html2canvas(captureTarget, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+      })
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95)
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const imgWidth = pageWidth
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      let heightLeft = imgHeight
+      let position = 0
+
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+
+      while (heightLeft > 0) {
+        position -= pageHeight
+        pdf.addPage()
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+      }
+
+      pdf.save(`${customerName || '고객'}_이사계약서.pdf`)
+      setPdfStatus('PDF 파일이 생성되었습니다. 다운로드 폴더를 확인해 주세요.')
+    } catch (error) {
+      console.error('PDF 생성 오류:', error)
+      setPdfStatus('PDF 생성에 실패했습니다. 이미지 저장(PNG)을 먼저 사용하거나 새로고침 후 다시 시도해 주세요.')
+    } finally {
+      if (captureTarget) captureTarget.remove()
+    }
+  }
+
+  const shareContract = async () => {
+    const shareText = buildContractText()
+    setShareStatus('')
+
+    try {
+      if (navigator.share && window.isSecureContext) {
+        await navigator.share({ title: '이사 견적 계약 안내', text: shareText })
+        setShareStatus('공유창을 열었습니다.')
+        return
+      }
+    } catch (error) {
+      console.warn('navigator.share failed, falling back to clipboard:', error)
+    }
+
+    const copied = await copyTextFallback(shareText)
+
+    if (copied) {
+      setShareStatus('계약 안내문이 복사되었습니다. 카카오톡에 붙여넣어 주세요.')
+      alert('계약 안내문이 복사되었습니다. 카카오톡에 붙여넣어 주세요.')
+    } else {
+      setShareStatus('자동 공유가 차단되었습니다. 내용을 직접 복사해 주세요.')
+      alert('자동 공유가 차단되었습니다. 브라우저 주소창이 https인지 확인하거나 내용을 직접 복사해 주세요.')
+    }
+  }
+
+  const moneyFields = [
+    ['기본 이사비용', baseCost, setBaseCost, false],
+    ['옵션 비용', optionCost, setOptionCost, false],
+    ['총 견적 금액', totalCost, null, true],
+    ['사다리차 비용', ladderCost, setLadderCost, false],
+    ['계약금', depositCost, setDepositCost, false],
+    ['잔금', balanceCost, null, true],
+  ]
+
   return (
-    <div className="min-h-screen bg-gray-100 p-3 text-gray-950 antialiased">
-      <div ref={contractRef} className="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg p-4 space-y-6">
-        <h1 className="text-3xl font-extrabold text-center text-gray-950">이사 견적 · 계약서</h1>
+    <div style={styles.page}>
+      <div ref={contractRef} style={styles.card}>
+        <h1 style={styles.title}>이사 견적 · 계약서</h1>
 
-        {/* 고객 정보 */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-bold border-b border-gray-400 pb-2 text-gray-950">고객 정보</h2>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-base font-semibold text-gray-950">고객명</label>
-              <input
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-                placeholder="고객명"
-              />
-            </div>
-
-            <div>
-              <label className="text-base font-semibold text-gray-950">연락처</label>
-              <input
-                type="tel"
-                inputMode="numeric"
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(formatPhoneNumber(e.target.value))}
-                className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-                placeholder="010-0000-0000"
-              />
-            </div>
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>고객 정보</h2>
+          <div style={styles.grid2}>
+            <Field label="고객명"><input value={customerName} onChange={(e) => setCustomerName(e.target.value)} style={styles.input} placeholder="고객명" /></Field>
+            <Field label="연락처"><input type="tel" inputMode="numeric" value={customerPhone} onChange={(e) => setCustomerPhone(formatPhoneNumber(e.target.value))} style={styles.input} placeholder="010-0000-0000" /></Field>
           </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-base font-semibold text-gray-950">출발지 주소</label>
-              <input
-                value={startAddress}
-                onChange={(e) => setStartAddress(e.target.value)}
-                className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-                placeholder="출발지 주소"
-              />
-            </div>
-
-            <div>
-              <label className="text-base font-semibold text-gray-950">도착지 주소</label>
-              <input
-                value={endAddress}
-                onChange={(e) => setEndAddress(e.target.value)}
-                className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-                placeholder="도착지 주소"
-              />
-            </div>
+          <div style={styles.grid2}>
+            <Field label="출발지 주소"><input value={startAddress} onChange={(e) => setStartAddress(e.target.value)} style={styles.input} placeholder="출발지 주소" /></Field>
+            <Field label="도착지 주소"><input value={endAddress} onChange={(e) => setEndAddress(e.target.value)} style={styles.input} placeholder="도착지 주소" /></Field>
           </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-base font-semibold text-gray-950">포장일</label>
-              <input
-                type="date"
-                value={packingDate}
-                onChange={(e) => setPackingDate(e.target.value)}
-                className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-              />
-            </div>
-
-            <div>
-              <label className="text-base font-semibold text-gray-950">운반일</label>
-              <input
-                type="date"
-                value={moveDate}
-                onChange={(e) => setMoveDate(e.target.value)}
-                className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-              />
-            </div>
+          <div style={styles.grid2}>
+            <Field label="포장일"><input type="date" value={packingDate} onChange={(e) => setPackingDate(e.target.value)} style={styles.input} /></Field>
+            <Field label="운반일"><input type="date" value={moveDate} onChange={(e) => setMoveDate(e.target.value)} style={styles.input} /></Field>
           </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-base font-semibold text-gray-950">시작 시간</label>
-
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={startHour}
-                  onChange={(e) => setStartHour(e.target.value)}
-                  className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-                >
-                  {Array.from({ length: 24 }, (_, hour) => (
-                    <option key={hour} value={String(hour).padStart(2, '0')}>
-                      {String(hour).padStart(2, '0')}시
-                    </option>
-                  ))}
+          <div style={styles.grid2}>
+            <Field label="시작 시간">
+              <div style={styles.grid2Small}>
+                <select value={startHour} onChange={(e) => setStartHour(e.target.value)} style={styles.input}>
+                  {Array.from({ length: 24 }, (_, hour) => <option key={hour} value={String(hour).padStart(2, '0')}>{String(hour).padStart(2, '0')}시</option>)}
                 </select>
-
-                <select
-                  value={startMinute}
-                  onChange={(e) => setStartMinute(e.target.value)}
-                  className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-                >
-                  {[0, 10, 20, 30, 40, 50].map((minute) => (
-                    <option key={minute} value={String(minute).padStart(2, '0')}>
-                      {String(minute).padStart(2, '0')}분
-                    </option>
-                  ))}
+                <select value={startMinute} onChange={(e) => setStartMinute(e.target.value)} style={styles.input}>
+                  {[0, 10, 20, 30, 40, 50].map((minute) => <option key={minute} value={String(minute).padStart(2, '0')}>{String(minute).padStart(2, '0')}분</option>)}
                 </select>
               </div>
-            </div>
-
-            <div>
-              <label className="text-base font-semibold text-gray-950">경유지</label>
-              <input
-                value={stopover}
-                onChange={(e) => setStopover(e.target.value)}
-                className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-                placeholder="경유지"
-              />
-            </div>
+            </Field>
+            <Field label="경유지"><input value={stopover} onChange={(e) => setStopover(e.target.value)} style={styles.input} placeholder="경유지" /></Field>
           </div>
         </section>
 
-        {/* 계약 상품 */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-bold border-b border-gray-400 pb-2 text-gray-950">계약 상품</h2>
-
-          <div className="grid grid-cols-2 gap-3 text-base font-semibold text-gray-950">
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>계약 상품</h2>
+          <div style={{ ...styles.grid2, fontSize: 16, fontWeight: 700 }}>
             <label><input type="checkbox" onChange={() => toggleValue('포장이사', setMoveTypes)} /> 포장이사</label>
             <label><input type="checkbox" onChange={() => toggleValue('일반이사', setMoveTypes)} /> 일반이사</label>
-
             <label><input type="checkbox" onChange={() => toggleValue('반포장이사', setMoveTypes)} /> 반포장이사</label>
             <label><input type="checkbox" onChange={() => toggleValue('사무실이사', setMoveTypes)} /> 사무실이사</label>
-
-            <div className="flex items-center gap-2 col-span-2 flex-wrap">
-              <label><input type="checkbox" onChange={() => toggleValue('보관이사', setMoveTypes)} /> 보관이사</label>
-
-              <select
-                value={storageDays}
-                onChange={(e) => setStorageDays(e.target.value)}
-                className="border border-gray-400 rounded-xl p-2 text-base font-semibold text-gray-950 bg-white"
-              >
-                {Array.from({ length: 365 }, (_, i) => (
-                  <option key={i + 1}>{i + 1}일</option>
-                ))}
-              </select>
-            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontWeight: 700 }}>
+            <label><input type="checkbox" onChange={() => toggleValue('보관이사', setMoveTypes)} /> 보관이사</label>
+            <select value={storageDays} onChange={(e) => setStorageDays(e.target.value)} style={{ ...styles.input, width: 120 }}>
+              {Array.from({ length: 365 }, (_, i) => <option key={i + 1}>{i + 1}일</option>)}
+            </select>
           </div>
 
-          <h3 className="font-medium">주거 형태</h3>
-          <div className="grid grid-cols-2 gap-3 text-base font-semibold text-gray-950">
+          <h3 style={{ fontSize: 16, fontWeight: 800, color: '#111827' }}>주거 형태</h3>
+          <div style={{ ...styles.grid2, fontSize: 16, fontWeight: 700 }}>
             <label><input type="checkbox" onChange={() => toggleValue('아파트', setHouseTypes)} /> 아파트</label>
             <label><input type="checkbox" onChange={() => toggleValue('빌라', setHouseTypes)} /> 빌라</label>
             <label><input type="checkbox" onChange={() => toggleValue('오피스텔/원룸', setHouseTypes)} /> 오피스텔/원룸</label>
@@ -430,360 +547,96 @@ ${bankName} ${accountNumber} (예금주: ${accountHolder})
             <label><input type="checkbox" onChange={() => toggleValue('상가', setHouseTypes)} /> 상가</label>
           </div>
 
-          <div>
-            <label className="text-base font-semibold text-gray-950 block mb-1">작업 용량</label>
-            <select
-              value={workVolume}
-              onChange={(e) => setWorkVolume(e.target.value)}
-              className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-            >
-              <option>1톤</option>
-              <option>2.5톤</option>
-              <option>5톤</option>
-              <option>6톤</option>
-              <option>7.5톤</option>
-              <option>7.5톤 이상</option>
+          <Field label="작업 용량">
+            <select value={workVolume} onChange={(e) => setWorkVolume(e.target.value)} style={styles.input}>
+              <option>1톤</option><option>2.5톤</option><option>5톤</option><option>6톤</option><option>7.5톤</option><option>7.5톤 이상</option>
             </select>
+          </Field>
+
+          <div style={styles.grid2}>
+            <Field label="출발지 운반수단">
+              <div style={styles.grid2Small}>
+                <select value={startCarryMethod} onChange={(e) => setStartCarryMethod(e.target.value)} style={styles.input}><option>사다리차</option><option>엘레베이터</option><option>계단작업</option></select>
+                <select value={startFloor} onChange={(e) => setStartFloor(e.target.value)} style={styles.input}>{Array.from({ length: 100 }, (_, i) => <option key={i + 1}>{i + 1}층</option>)}</select>
+              </div>
+            </Field>
+            <Field label="도착지 운반수단">
+              <div style={styles.grid2Small}>
+                <select value={endCarryMethod} onChange={(e) => setEndCarryMethod(e.target.value)} style={styles.input}><option>사다리차</option><option>엘레베이터</option><option>계단작업</option></select>
+                <select value={endFloor} onChange={(e) => setEndFloor(e.target.value)} style={styles.input}>{Array.from({ length: 100 }, (_, i) => <option key={i + 1}>{i + 1}층</option>)}</select>
+              </div>
+            </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-base font-semibold text-gray-950 block mb-1">출발지 운반수단</label>
-
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={startCarryMethod}
-                  onChange={(e) => setStartCarryMethod(e.target.value)}
-                  className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-                >
-                  <option>사다리차</option>
-                  <option>엘레베이터</option>
-                  <option>계단작업</option>
-                </select>
-
-                <select
-                  value={startFloor}
-                  onChange={(e) => setStartFloor(e.target.value)}
-                  className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-                >
-                  {Array.from({ length: 100 }, (_, i) => (
-                    <option key={i + 1}>{i + 1}층</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-base font-semibold text-gray-950 block mb-1">도착지 운반수단</label>
-
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={endCarryMethod}
-                  onChange={(e) => setEndCarryMethod(e.target.value)}
-                  className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-                >
-                  <option>사다리차</option>
-                  <option>엘레베이터</option>
-                  <option>계단작업</option>
-                </select>
-
-                <select
-                  value={endFloor}
-                  onChange={(e) => setEndFloor(e.target.value)}
-                  className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-                >
-                  {Array.from({ length: 100 }, (_, i) => (
-                    <option key={i + 1}>{i + 1}층</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-base font-semibold text-gray-950 block mb-1">남 작업인원</label>
-              <select
-                value={maleWorkers}
-                onChange={(e) => setMaleWorkers(e.target.value)}
-                className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-              >
-                {Array.from({ length: 11 }, (_, i) => (
-                  <option key={i}>{i}명</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-base font-semibold text-gray-950 block mb-1">여 작업인원</label>
-              <select
-                value={femaleWorkers}
-                onChange={(e) => setFemaleWorkers(e.target.value)}
-                className="w-full border border-gray-400 rounded-xl p-3 text-base font-semibold text-gray-950 bg-white"
-              >
-                {Array.from({ length: 11 }, (_, i) => (
-                  <option key={i}>{i}명</option>
-                ))}
-              </select>
-            </div>
+          <div style={styles.grid2}>
+            <Field label="남 작업인원"><select value={maleWorkers} onChange={(e) => setMaleWorkers(e.target.value)} style={styles.input}>{Array.from({ length: 11 }, (_, i) => <option key={i}>{i}명</option>)}</select></Field>
+            <Field label="여 작업인원"><select value={femaleWorkers} onChange={(e) => setFemaleWorkers(e.target.value)} style={styles.input}>{Array.from({ length: 11 }, (_, i) => <option key={i}>{i}명</option>)}</select></Field>
           </div>
         </section>
 
-        {/* 옵션 */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-bold border-b border-gray-400 pb-2 text-gray-950">옵션 및 추가비용</h2>
-
-          {[1,2,3,4]
-            .slice(0, optionCount)
-            .map((num) => (
-            <div key={num}>
-              <label className="text-base font-semibold text-gray-950 block mb-1">옵션 {num}</label>
-
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={optionItems[num - 1].name}
-                  onChange={(e) => updateOptionItem(num - 1, 'name', e.target.value)}
-                  className="border border-gray-400 rounded-xl p-3 w-full text-base font-semibold text-gray-950 bg-white"
-                >
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>옵션 및 추가비용</h2>
+          {[1, 2, 3, 4].slice(0, optionCount).map((num) => (
+            <Field key={num} label={`옵션 ${num}`}>
+              <div style={styles.grid2Small}>
+                <select value={optionItems[num - 1].name} onChange={(e) => updateOptionItem(num - 1, 'name', e.target.value)} style={styles.input}>{optionNames.map((name) => <option key={name}>{name}</option>)}</select>
+                <select value={optionItems[num - 1].price} onChange={(e) => updateOptionItem(num - 1, 'price', e.target.value)} style={styles.input}>
                   <option>없음</option>
-                  <option>벽걸이 TV</option>
-                  <option>돌침대</option>
-                  <option>조립장농</option>
-                  <option>피아노</option>
-                  <option>날짜옵션</option>
-                  <option>이동거리</option>
-                  <option>이사작업지연</option>
-                  <option>보관비용</option>
-                  <option>기타</option>
-                </select>
-
-                <select
-                  value={optionItems[num - 1].price}
-                  onChange={(e) => updateOptionItem(num - 1, 'price', e.target.value)}
-                  className="border border-gray-400 rounded-xl p-3 w-full text-base font-semibold text-gray-950 bg-white"
-                >
-                  <option>없음</option>
-                  {Array.from({ length: 100 }, (_, i) => (
-                    <option key={i + 1}>{i + 1}만원</option>
-                  ))}
+                  {Array.from({ length: 100 }, (_, i) => <option key={i + 1}>{i + 1}만원</option>)}
                 </select>
               </div>
-            </div>
+            </Field>
           ))}
-        <button
-            type="button"
-            onClick={() => setOptionCount((prev) => Math.min(prev + 1, 4))}
-            className="w-full border-2 border-dashed border-gray-300 rounded-2xl py-3 text-gray-600 font-medium"
-          >
-            + 옵션 추가
-          </button>
+          <button type="button" onClick={() => setOptionCount((prev) => Math.min(prev + 1, 4))} style={{ ...styles.button, border: '2px dashed #d1d5db', color: '#4b5563', background: '#ffffff' }}>+ 옵션 추가</button>
         </section>
 
-        {/* 금액 */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-bold border-b border-gray-400 pb-2 text-gray-950">견적 금액</h2>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-base font-semibold text-gray-950 block mb-1">기본 이사비용</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={baseCost}
-                  onChange={(e) => setBaseCost(e.target.value)}
-                  className="border rounded-xl p-3 w-full pr-14"
-                  placeholder="0"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-800 text-base font-semibold">
-                  만원
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-base font-semibold text-gray-950 block mb-1">옵션 비용</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={optionCost}
-                  onChange={(e) => setOptionCost(e.target.value)}
-                  className="border rounded-xl p-3 w-full pr-14"
-                  placeholder="0"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-800 text-base font-semibold">
-                  만원
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-base font-semibold text-gray-950 block mb-1">총 견적 금액</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={totalCost}
-                  readOnly
-                  className="border rounded-xl p-3 w-full pr-14 bg-gray-100"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-800 text-base font-semibold">
-                  만원
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-base font-semibold text-gray-950 block mb-1">사다리차 비용</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={ladderCost}
-                  onChange={(e) => setLadderCost(e.target.value)}
-                  className="border rounded-xl p-3 w-full pr-14"
-                  placeholder="0"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-800 text-base font-semibold">
-                  만원
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-base font-semibold text-gray-950 block mb-1">계약금</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={depositCost}
-                  onChange={(e) => setDepositCost(e.target.value)}
-                  className="border rounded-xl p-3 w-full pr-14"
-                  placeholder="0"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-800 text-base font-semibold">
-                  만원
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-base font-semibold text-gray-950 block mb-1">잔금</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={balanceCost}
-                  readOnly
-                  className="border rounded-xl p-3 w-full pr-14 bg-gray-100"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-800 text-base font-semibold">
-                  만원
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* 입금 계좌 */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-bold border-b border-gray-400 pb-2 text-gray-950">입금 계좌</h2>
-
-          <div className="rounded-2xl border-2 border-teal-500 bg-white p-4 shadow-sm">
-            <div className="flex items-start justify-center gap-12 text-center flex-wrap">
-              <div>
-                <div className="text-orange-500 text-lg font-black leading-none mb-2">예금주</div>
-                <div className="text-xl font-semibold text-gray-950">윤도근</div>
-              </div>
-
-              <div>
-                <div className="text-orange-500 text-lg font-black leading-none mb-2 text-left">농협</div>
-                <div className="text-xl font-semibold tracking-tight text-gray-950">
-                  352-1025-5721-13
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>견적 금액</h2>
+          <div style={styles.grid2}>
+            {moneyFields.map(([label, value, setter, readOnly]) => (
+              <Field key={label} label={label}>
+                <div style={{ position: 'relative' }}>
+                  <input type="number" value={value} readOnly={readOnly} onChange={setter ? (e) => setter(e.target.value) : undefined} style={{ ...styles.input, paddingRight: 56, background: readOnly ? '#f3f4f6' : '#ffffff' }} placeholder="0" />
+                  <span style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', color: '#374151', fontSize: 16, fontWeight: 700 }}>만원</span>
                 </div>
-              </div>
+              </Field>
+            ))}
+          </div>
+        </section>
+
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>입금 계좌</h2>
+          <div style={{ border: '2px solid #14b8a6', background: '#ffffff', borderRadius: 16, padding: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: 48, textAlign: 'center', flexWrap: 'wrap' }}>
+              <div><div style={{ color: '#f97316', fontSize: 18, fontWeight: 900, marginBottom: 8 }}>예금주</div><div style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>윤도근</div></div>
+              <div><div style={{ color: '#f97316', fontSize: 18, fontWeight: 900, marginBottom: 8, textAlign: 'left' }}>농협</div><div style={{ fontSize: 20, fontWeight: 700, color: '#111827', letterSpacing: -0.3 }}>352-1025-5721-13</div></div>
             </div>
           </div>
         </section>
 
-        {/* 비고 */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-bold border-b border-gray-400 pb-2 text-gray-950">비고 및 요청사항</h2>
-
-          <div>
-            <label className="text-base font-semibold text-gray-950 block mb-1">고객 요청 및 주의사항</label>
-            <textarea
-              value={customerMemo}
-              onChange={(e) => setCustomerMemo(e.target.value)}
-              className="w-full border rounded-xl p-3 h-24"
-              placeholder="고객 요청 및 주의사항"
-            />
-          </div>
-
-          <div>
-            <label className="text-base font-semibold text-gray-950 block mb-1">견적 제외 품목</label>
-            <textarea
-              value={excludedItems}
-              onChange={(e) => setExcludedItems(e.target.value)}
-              className="w-full border rounded-xl p-3 h-24"
-              placeholder="견적 제외 품목"
-            />
-          </div>
-
-          <div>
-            <label className="text-base font-semibold text-gray-950 block mb-1">기타 메모</label>
-            <textarea
-              value={etcMemo}
-              onChange={(e) => setEtcMemo(e.target.value)}
-              className="w-full border rounded-xl p-3 h-24"
-              placeholder="기타 메모"
-            />
-          </div>
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>비고 및 요청사항</h2>
+          <Field label="고객 요청 및 주의사항"><textarea value={customerMemo} onChange={(e) => setCustomerMemo(e.target.value)} style={styles.textarea} placeholder="고객 요청 및 주의사항" /></Field>
+          <Field label="견적 제외 품목"><textarea value={excludedItems} onChange={(e) => setExcludedItems(e.target.value)} style={styles.textarea} placeholder="견적 제외 품목" /></Field>
+          <Field label="기타 메모"><textarea value={etcMemo} onChange={(e) => setEtcMemo(e.target.value)} style={styles.textarea} placeholder="기타 메모" /></Field>
         </section>
 
-        {/* 버튼 */}
-        <section className="space-y-3 pt-2">
-          <button
-            type="button"
-            onClick={handlePdfDownload}
-            className="w-full bg-black text-white rounded-2xl py-4 font-semibold"
-          >
-            PDF 계약서 생성
-          </button>
-
-          <button
-            type="button"
-            onClick={handleImageDownload}
-            className="w-full bg-green-600 text-white rounded-2xl py-4 font-semibold"
-          >
-            이미지 저장 (PNG)
-          </button>
-
-          <button
-            type="button"
-            onClick={downloadICS}
-            className="w-full bg-blue-600 text-white rounded-2xl py-4 font-semibold"
-          >
-            일정 등록 (.ICS)
-          </button>
-
-          <button
-            type="button"
-            onClick={shareContract}
-            className="w-full bg-yellow-400 text-black rounded-2xl py-4 font-semibold"
-          >
-            카카오톡 공유
-          </button>
+        <section data-capture-ignore="true" style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 8 }}>
+          <button type="button" onClick={handlePdfDownload} style={{ ...styles.button, background: '#111827', color: '#ffffff' }}>PDF 계약서 생성</button>
+          {pdfStatus && <div style={{ borderRadius: 12, background: '#f3f4f6', border: '1px solid #d1d5db', padding: 12, fontSize: 14, fontWeight: 700, color: '#111827' }}>{pdfStatus}</div>}
+          <button type="button" onClick={handleImageDownload} style={{ ...styles.button, background: '#16a34a', color: '#ffffff' }}>이미지 저장 (PNG)</button>
+          <button type="button" onClick={downloadICS} style={{ ...styles.button, background: '#2563eb', color: '#ffffff' }}>일정 등록 (.ICS)</button>
+          <button type="button" onClick={shareContract} style={{ ...styles.button, background: '#facc15', color: '#111827' }}>카카오톡 공유</button>
+          {shareStatus && <div style={{ borderRadius: 12, background: '#fefce8', border: '1px solid #fde047', padding: 12, fontSize: 14, fontWeight: 700, color: '#111827' }}>{shareStatus}</div>}
         </section>
 
-        <div className="text-xs text-gray-500 border-t pt-4 leading-6">
-          <div className="text-base font-bold text-gray-950 mb-2">
-            계약금 입금계좌: {bankName} {accountNumber} (예금주: {accountHolder})
-          </div>
+        <div style={styles.helperText}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#111827', marginBottom: 8 }}>계약금 입금계좌: {bankName} {accountNumber} (예금주: {accountHolder})</div>
           ※ 계약금 10% 납입 시 계약 확정
           <br />※ 카드 및 현금영수증 발행 시 부가세 10% 별도
           <br />※ 견적 외 추가 물품 발생 시 추가 비용 발생 가능
         </div>
       </div>
     </div>
-  );
+  )
 }
