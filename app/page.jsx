@@ -413,18 +413,76 @@ END:VCALENDAR`
   }
 
   const handlePdfDownload = async () => {
-    setPdfStatus('PDF 생성 중입니다. 잠시만 기다려 주세요.')
-    let captureTarget = null
+    setPdfStatus('텍스트 계약서 PDF 생성 중입니다. 잠시만 기다려 주세요.')
+    let pdfTarget = null
 
     try {
       if (document.fonts?.ready) await document.fonts.ready
-      captureTarget = prepareCaptureElement()
-      if (!captureTarget) {
-        setPdfStatus('PDF로 저장할 계약서 영역을 찾지 못했습니다.')
-        return
-      }
 
-      const canvas = await html2canvas(captureTarget, {
+      const contractText = buildContractText()
+      const lines = contractText.split('
+')
+
+      pdfTarget = document.createElement('div')
+      pdfTarget.style.position = 'fixed'
+      pdfTarget.style.left = '-10000px'
+      pdfTarget.style.top = '0'
+      pdfTarget.style.width = '794px'
+      pdfTarget.style.backgroundColor = '#ffffff'
+      pdfTarget.style.color = '#111827'
+      pdfTarget.style.padding = '40px'
+      pdfTarget.style.boxSizing = 'border-box'
+      pdfTarget.style.fontFamily = 'Arial, sans-serif'
+      pdfTarget.style.lineHeight = '1.6'
+
+      const title = document.createElement('div')
+      title.textContent = '이사 견적 · 계약서'
+      title.style.fontSize = '28px'
+      title.style.fontWeight = '900'
+      title.style.textAlign = 'center'
+      title.style.marginBottom = '24px'
+      title.style.paddingBottom = '16px'
+      title.style.borderBottom = '2px solid #111827'
+      pdfTarget.appendChild(title)
+
+      lines.forEach((line) => {
+        const row = document.createElement('div')
+        row.textContent = line || ' '
+
+        if (line.startsWith('【') && line.endsWith('】')) {
+          row.style.fontSize = '18px'
+          row.style.fontWeight = '900'
+          row.style.color = '#0f766e'
+          row.style.marginTop = '18px'
+          row.style.marginBottom = '8px'
+          row.style.paddingBottom = '4px'
+          row.style.borderBottom = '1px solid #d1d5db'
+        } else {
+          row.style.fontSize = '15px'
+          row.style.fontWeight = '600'
+          row.style.color = '#111827'
+          row.style.marginBottom = '4px'
+          row.style.whiteSpace = 'pre-wrap'
+        }
+
+        pdfTarget.appendChild(row)
+      })
+
+      const notice = document.createElement('div')
+      notice.style.marginTop = '28px'
+      notice.style.paddingTop = '14px'
+      notice.style.borderTop = '1px solid #d1d5db'
+      notice.style.fontSize = '12px'
+      notice.style.color = '#4b5563'
+      notice.style.lineHeight = '1.8'
+      notice.innerText = '※ 계약금 10% 납입 시 계약 확정
+※ 카드 및 현금영수증 발행 시 부가세 10% 별도
+※ 견적 외 추가 물품 발생 시 추가 비용 발생 가능'
+      pdfTarget.appendChild(notice)
+
+      document.body.appendChild(pdfTarget)
+
+      const canvas = await html2canvas(pdfTarget, {
         scale: 2,
         backgroundColor: '#ffffff',
         useCORS: true,
@@ -451,12 +509,12 @@ END:VCALENDAR`
       }
 
       pdf.save(`${customerName || '고객'}_이사계약서.pdf`)
-      setPdfStatus('PDF 파일이 생성되었습니다. 다운로드 폴더를 확인해 주세요.')
+      setPdfStatus('텍스트 계약서 PDF 파일이 생성되었습니다.')
     } catch (error) {
       console.error('PDF 생성 오류:', error)
-      setPdfStatus('PDF 생성에 실패했습니다. 이미지 저장(PNG)을 먼저 사용하거나 새로고침 후 다시 시도해 주세요.')
+      setPdfStatus('PDF 생성에 실패했습니다. 새로고침 후 다시 시도해 주세요.')
     } finally {
-      if (captureTarget) captureTarget.remove()
+      if (pdfTarget) pdfTarget.remove()
     }
   }
 
