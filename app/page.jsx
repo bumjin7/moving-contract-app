@@ -3,8 +3,21 @@
 import { useEffect, useRef, useState } from 'react'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
-import { db } from './firebase'
-import { addDoc, collection, getDocs, orderBy, query } from 'firebase/firestore'
+import { initializeApp, getApps } from 'firebase/app'
+import { addDoc, collection, getDocs, getFirestore, orderBy, query } from 'firebase/firestore'
+
+const firebaseConfig = {
+  apiKey: 'AIzaSyAiPL2H2Hd1VpQ5DgZHeXxpYa94jxFyOjs',
+  authDomain: 'moving-contract-app.firebaseapp.com',
+  projectId: 'moving-contract-app',
+  storageBucket: 'moving-contract-app.firebasestorage.app',
+  messagingSenderId: '578177021565',
+  appId: '1:578177021565:web:b41bd594653a812413a314',
+}
+
+const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig)
+const db = getFirestore(firebaseApp)
+
 
 export const phoneFormatTestCases = [
   { input: '01012341234', expected: '010-1234-1234' },
@@ -420,8 +433,7 @@ END:VCALENDAR`
       if (document.fonts?.ready) await document.fonts.ready
 
       const contractText = buildContractText()
-      const lines = contractText.split('
-')
+      const lines = contractText.split('\n')
 
       pdfTarget = document.createElement('div')
       pdfTarget.style.position = 'fixed'
@@ -475,9 +487,7 @@ END:VCALENDAR`
       notice.style.fontSize = '12px'
       notice.style.color = '#4b5563'
       notice.style.lineHeight = '1.8'
-      notice.innerText = '※ 계약금 10% 납입 시 계약 확정
-※ 카드 및 현금영수증 발행 시 부가세 10% 별도
-※ 견적 외 추가 물품 발생 시 추가 비용 발생 가능'
+      notice.innerHTML = '※ 계약금 10% 납입 시 계약 확정<br />※ 카드 및 현금영수증 발행 시 부가세 10% 별도<br />※ 견적 외 추가 물품 발생 시 추가 비용 발생 가능'
       pdfTarget.appendChild(notice)
 
       document.body.appendChild(pdfTarget)
