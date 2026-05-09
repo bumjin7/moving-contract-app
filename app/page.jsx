@@ -100,6 +100,14 @@ export default function MovingContractApp() {
       .map((option, index) => `옵션 ${index + 1}: ${option.name || '없음'} / ${option.price || '없음'}`)
       .join('\n')
 
+    const icsEscape = (text) => {
+      return String(text)
+        .replace(/\\/g, '\\\\')
+        .replace(/;/g, '\\;')
+        .replace(/,/g, '\\,')
+        .replace(/\n/g, '\\n')
+    }
+
     const icsDescription = [
       '【고객 정보】',
       `고객명: ${customerName || '-'}`,
@@ -133,26 +141,18 @@ export default function MovingContractApp() {
       `총 견적 금액: ${totalCost}만원`,
       `계약금: ${depositCost || 0}만원`,
       `잔금: ${balanceCost}만원`,
-      '',
-      '【견적 금액】',
-      `기본 이사비용: ${baseCost || 0}만원`,
-      `옵션 비용: ${optionCost || 0}만원`,
-      `사다리차 비용: ${ladderCost || 0}만원`,
-      `총 견적 금액: ${totalCost}만원`,
-      `계약금: ${depositCost || 0}만원`,
-      `잔금: ${balanceCost}만원`,
     ].join('\n')
 
     const icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Moving Contract App//KR
 BEGIN:VEVENT
-SUMMARY:${customerName || '고객'} 이사 일정 ${customerPhone ? `(${customerPhone})` : ''}
+SUMMARY:${icsEscape(`${customerName || '고객'} 이사 일정 ${customerPhone ? `(${customerPhone})` : ''}`)}
 DTSTART:${formatDate(startDate)}
 DTEND:${formatDate(endDate)}
-LOCATION:${startAddress} → ${endAddress}
-CONTACT:${customerPhone || ''}
-DESCRIPTION:${icsDescription}
+LOCATION:${icsEscape(`${startAddress} → ${endAddress}`)}
+CONTACT:${icsEscape(customerPhone || '')}
+DESCRIPTION:${icsEscape(icsDescription)}
 END:VEVENT
 END:VCALENDAR`
 
