@@ -1,8 +1,10 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
+import { db } from './firebase'
+import { addDoc, collection, getDocs, orderBy, query } from 'firebase/firestore'
 
 export const phoneFormatTestCases = [
   { input: '01012341234', expected: '010-1234-1234' },
@@ -226,6 +228,9 @@ export default function MovingContractApp() {
   const [etcMemo, setEtcMemo] = useState('')
   const [shareStatus, setShareStatus] = useState('')
   const [pdfStatus, setPdfStatus] = useState('')
+  const [savedContracts, setSavedContracts] = useState([])
+  const [searchTerm, setSearchTerm] = useState('')
+  const [saveStatus, setSaveStatus] = useState('')
 
   const totalCost = (Number(baseCost) || 0) + (Number(optionCost) || 0) + (Number(ladderCost) || 0)
   const balanceCost = totalCost - (Number(depositCost) || 0)
@@ -480,6 +485,112 @@ END:VCALENDAR`
     }
   }
 
+  const saveContract = async () => {
+    setSaveStatus('계약서 저장 중입니다...')
+
+    try {
+      const contractData = {
+        customerName,
+        customerPhone,
+        startAddress,
+        endAddress,
+        packingDate,
+        moveDate,
+        startHour,
+        startMinute,
+        stopover,
+        moveTypes,
+        storageDays,
+        houseTypes,
+        workVolume,
+        startCarryMethod,
+        startFloor,
+        endCarryMethod,
+        endFloor,
+        maleWorkers,
+        femaleWorkers,
+        optionItems,
+        baseCost,
+        optionCost,
+        ladderCost,
+        depositCost,
+        totalCost,
+        balanceCost,
+        customerMemo,
+        excludedItems,
+        etcMemo,
+        createdAt: new Date().toISOString(),
+      }
+
+      await addDoc(collection(db, 'contracts'), contractData)
+      setSaveStatus('계약서가 저장되었습니다.')
+      await loadContracts()
+    } catch (error) {
+      console.error('계약서 저장 오류:', error)
+      setSaveStatus('계약서 저장에 실패했습니다. Firebase 설정을 확인해 주세요.')
+    }
+  }
+
+  const loadContracts = async () => {
+    try {
+      const q = query(collection(db, 'contracts'), orderBy('createdAt', 'desc'))
+      const snapshot = await getDocs(q)
+      const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      setSavedContracts(list)
+    } catch (error) {
+      console.error('계약서 조회 오류:', error)
+    }
+  }
+
+  const loadContractToForm = (item) => {
+    setCustomerName(item.customerName || '')
+    setCustomerPhone(item.customerPhone || '')
+    setStartAddress(item.startAddress || '')
+    setEndAddress(item.endAddress || '')
+    setPackingDate(item.packingDate || '')
+    setMoveDate(item.moveDate || '')
+    setStartHour(item.startHour || '08')
+    setStartMinute(item.startMinute || '00')
+    setStopover(item.stopover || '')
+    setMoveTypes(item.moveTypes || [])
+    setStorageDays(item.storageDays || '1일')
+    setHouseTypes(item.houseTypes || [])
+    setWorkVolume(item.workVolume || '1톤')
+    setStartCarryMethod(item.startCarryMethod || '사다리차')
+    setStartFloor(item.startFloor || '1층')
+    setEndCarryMethod(item.endCarryMethod || '사다리차')
+    setEndFloor(item.endFloor || '1층')
+    setMaleWorkers(item.maleWorkers || '0명')
+    setFemaleWorkers(item.femaleWorkers || '0명')
+    setOptionItems(item.optionItems || [
+      { name: '없음', price: '없음' },
+      { name: '없음', price: '없음' },
+      { name: '없음', price: '없음' },
+      { name: '없음', price: '없음' },
+    ])
+    setBaseCost(item.baseCost || '')
+    setOptionCost(item.optionCost || '')
+    setLadderCost(item.ladderCost || '')
+    setDepositCost(item.depositCost || '')
+    setCustomerMemo(item.customerMemo || '')
+    setExcludedItems(item.excludedItems || '')
+    setEtcMemo(item.etcMemo || '')
+    setSaveStatus('저장된 계약서를 불러왔습니다.')
+  }
+
+  const filteredContracts = savedContracts.filter((item) => {
+    const keyword = searchTerm.trim().toLowerCase()
+    if (!keyword) return true
+
+    return [item.customerName, item.customerPhone, item.startAddress, item.endAddress, item.moveDate]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(keyword))
+  })
+
+  useEffect(() => {
+    loadContracts()
+  }, [])
+
   const moneyFields = [
     ['기본 이사비용', baseCost, setBaseCost, false],
     ['옵션 비용', optionCost, setOptionCost, false],
@@ -622,12 +733,59 @@ END:VCALENDAR`
         </section>
 
         <section data-capture-ignore="true" style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 8 }}>
+          <button type="button" onClick={saveContract} style={{ ...styles.button, background: '#14b8a6', color: '#ffffff' }}>계약서 저장</button>
+          {saveStatus && <div style={{ borderRadius: 12, background: '#ecfeff', border: '1px solid #67e8f9', padding: 12, fontSize: 14, fontWeight: 700, color: '#111827' }}>{saveStatus}</div>}
           <button type="button" onClick={handlePdfDownload} style={{ ...styles.button, background: '#111827', color: '#ffffff' }}>PDF 계약서 생성</button>
           {pdfStatus && <div style={{ borderRadius: 12, background: '#f3f4f6', border: '1px solid #d1d5db', padding: 12, fontSize: 14, fontWeight: 700, color: '#111827' }}>{pdfStatus}</div>}
           <button type="button" onClick={handleImageDownload} style={{ ...styles.button, background: '#16a34a', color: '#ffffff' }}>이미지 저장 (PNG)</button>
           <button type="button" onClick={downloadICS} style={{ ...styles.button, background: '#2563eb', color: '#ffffff' }}>일정 등록 (.ICS)</button>
           <button type="button" onClick={shareContract} style={{ ...styles.button, background: '#facc15', color: '#111827' }}>카카오톡 공유</button>
           {shareStatus && <div style={{ borderRadius: 12, background: '#fefce8', border: '1px solid #fde047', padding: 12, fontSize: 14, fontWeight: 700, color: '#111827' }}>{shareStatus}</div>}
+        </section>
+
+        <section data-capture-ignore="true" style={styles.section}>
+          <h2 style={styles.sectionTitle}>저장된 계약서 조회</h2>
+
+          <input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={styles.input}
+            placeholder="고객명, 연락처, 주소, 날짜로 검색"
+          />
+
+          <button type="button" onClick={loadContracts} style={{ ...styles.button, background: '#6b7280', color: '#ffffff' }}>
+            저장 목록 새로고침
+          </button>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {filteredContracts.length === 0 ? (
+              <div style={{ border: '1px solid #d1d5db', borderRadius: 12, padding: 12, background: '#ffffff', color: '#6b7280', fontWeight: 700 }}>
+                저장된 계약서가 없습니다.
+              </div>
+            ) : (
+              filteredContracts.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => loadContractToForm(item)}
+                  style={{
+                    textAlign: 'left',
+                    border: '1px solid #d1d5db',
+                    borderRadius: 12,
+                    padding: 12,
+                    background: '#ffffff',
+                    color: '#111827',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ fontWeight: 900, fontSize: 16 }}>{item.customerName || '고객명 없음'}</div>
+                  <div style={{ fontWeight: 700 }}>{item.customerPhone || '연락처 없음'}</div>
+                  <div>{item.moveDate || '운반일 없음'}</div>
+                  <div style={{ color: '#6b7280', fontSize: 13 }}>{item.startAddress || '-'} → {item.endAddress || '-'}</div>
+                </button>
+              ))
+            )}
+          </div>
         </section>
 
         <div style={styles.helperText}>
