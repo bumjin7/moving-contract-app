@@ -380,178 +380,126 @@ END:VCALENDAR`
     downloadTextFile(`${customerName || '이사일정'}.ics`, icsContent, 'text/calendar;charset=utf-8')
   }
 
-  const buildTextContractElement = () => {
-    const contractText = buildContractText()
-    const lines = contractText.split('\n')
-
+  const buildStyledContractElement = () => {
     const target = document.createElement('div')
     target.style.position = 'fixed'
     target.style.left = '-10000px'
     target.style.top = '0'
-    target.style.width = '794px'
-    target.style.backgroundColor = '#ffffff'
-    target.style.color = '#111827'
-    target.style.padding = '40px'
-    target.style.boxSizing = 'border-box'
+    target.style.width = '900px'
+    target.style.background = '#ffffff'
+    target.style.borderRadius = '24px'
+    target.style.overflow = 'hidden'
     target.style.fontFamily = 'Arial, sans-serif'
-    target.style.lineHeight = '1.6'
+    target.style.color = '#111827'
+    target.style.boxShadow = '0 10px 40px rgba(0,0,0,0.12)'
 
-    const title = document.createElement('div')
-    title.textContent = '이사 견적 · 계약서'
-    title.style.fontSize = '28px'
-    title.style.fontWeight = '900'
-    title.style.textAlign = 'center'
-    title.style.marginBottom = '24px'
-    title.style.paddingBottom = '16px'
-    title.style.borderBottom = '2px solid #111827'
-    target.appendChild(title)
+    const today = new Date().toLocaleDateString('ko-KR')
 
-    lines.forEach((line) => {
-      const row = document.createElement('div')
-      row.textContent = line || ' '
+    target.innerHTML = `
+      <div style="padding:40px;border-top:10px solid #14b8a6;background:#ffffff;position:relative;overflow:hidden;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;">
+          <div>
+            <div style="font-size:56px;font-weight:900;color:#14b8a6;letter-spacing:-3px;line-height:1;">두근두근이사</div>
+            <div style="margin-top:10px;font-size:18px;color:#6b7280;font-weight:700;">마음까지 옮기는 행복한 이사</div>
+          </div>
 
-      if (line.startsWith('【') && line.endsWith('】')) {
-        row.style.fontSize = '18px'
-        row.style.fontWeight = '900'
-        row.style.color = '#0f766e'
-        row.style.marginTop = '18px'
-        row.style.marginBottom = '8px'
-        row.style.paddingBottom = '4px'
-        row.style.borderBottom = '1px solid #d1d5db'
-      } else {
-        row.style.fontSize = '15px'
-        row.style.fontWeight = '600'
-        row.style.color = '#111827'
-        row.style.marginBottom = '4px'
-        row.style.whiteSpace = 'pre-wrap'
-        row.style.wordBreak = 'break-word'
-      }
+          <div style="font-size:90px;opacity:0.15;">🚚</div>
+        </div>
 
-      target.appendChild(row)
-    })
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;gap:20px;">
+          <div>
+            <div style="font-size:52px;font-weight:900;color:#0f766e;letter-spacing:8px;">이 사 계 약 서</div>
+            <div style="margin-top:10px;font-size:18px;color:#6b7280;font-weight:700;">고객님의 소중한 이사를 책임지겠습니다.</div>
+          </div>
 
-    const notice = document.createElement('div')
-    notice.style.marginTop = '28px'
-    notice.style.paddingTop = '14px'
-    notice.style.borderTop = '1px solid #d1d5db'
-    notice.style.fontSize = '12px'
-    notice.style.color = '#4b5563'
-    notice.style.lineHeight = '1.8'
-    notice.innerHTML = '※ 계약금 10% 납입 시 계약 확정<br />※ 카드 및 현금영수증 발행 시 부가세 10% 별도<br />※ 견적 외 추가 물품 발생 시 추가 비용 발생 가능'
-    target.appendChild(notice)
+          <div style="border:2px solid #99f6e4;border-radius:16px;padding:16px 20px;min-width:230px;background:#f0fdfa;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:15px;">
+              <strong style="color:#0f766e;">계약일자</strong>
+              <span>${today}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:15px;">
+              <strong style="color:#0f766e;">담당자</strong>
+              <span>윤도근</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <div style="border:2px solid #ccfbf1;border-radius:18px;padding:20px;background:#ffffff;">
+            <div style="font-size:24px;font-weight:900;color:#0f766e;margin-bottom:16px;">고객 정보</div>
+            <div style="line-height:2;font-size:17px;">
+              <div><strong>고객명</strong> : ${customerName || '-'}</div>
+              <div><strong>연락처</strong> : ${customerPhone || '-'}</div>
+              <div><strong>출발지</strong> : ${startAddress || '-'}</div>
+              <div><strong>도착지</strong> : ${endAddress || '-'}</div>
+              <div><strong>운반일</strong> : ${moveDate || '-'}</div>
+            </div>
+          </div>
+
+          <div style="border:2px solid #ccfbf1;border-radius:18px;padding:20px;background:#ffffff;">
+            <div style="font-size:24px;font-weight:900;color:#0f766e;margin-bottom:16px;">계약 정보</div>
+            <div style="line-height:2;font-size:17px;">
+              <div><strong>계약상품</strong> : ${moveTypes.join(', ') || '-'}</div>
+              <div><strong>작업용량</strong> : ${workVolume}</div>
+              <div><strong>작업인원</strong> : 남 ${maleWorkers} / 여 ${femaleWorkers}</div>
+              <div><strong>운반수단</strong> : ${startCarryMethod} → ${endCarryMethod}</div>
+              <div><strong>경유지</strong> : ${stopover || '-'}</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:24px;border:2px solid #99f6e4;border-radius:18px;padding:24px;background:#f0fdfa;">
+          <div style="font-size:26px;font-weight:900;color:#0f766e;margin-bottom:16px;">견적 금액</div>
+          <div style="font-size:52px;font-weight:900;color:#14b8a6;margin-bottom:10px;">${totalCost.toLocaleString()}만원</div>
+          <div style="font-size:16px;color:#374151;font-weight:700;">기본비용 ${baseCost || 0}만원 / 옵션 ${optionCost || 0}만원 / 사다리차 ${ladderCost || 0}만원</div>
+          <div style="margin-top:10px;font-size:15px;color:#dc2626;font-weight:800;">※ 카드결제 및 현금영수증 발행 시 부가세 별도</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;">
+          <div style="border:2px solid #d1d5db;border-radius:18px;padding:20px;background:#ffffff;">
+            <div style="font-size:24px;font-weight:900;color:#0f766e;margin-bottom:16px;">옵션 및 요청사항</div>
+            <div style="white-space:pre-wrap;line-height:1.9;font-size:16px;">
+              ${getVisibleOptionsText(true) || '옵션 없음'}
+
+고객 요청사항:
+${customerMemo || '-'}
+            </div>
+          </div>
+
+          <div style="border:2px solid #d1d5db;border-radius:18px;padding:20px;background:#ffffff;">
+            <div style="font-size:24px;font-weight:900;color:#0f766e;margin-bottom:16px;">계약금 입금 계좌</div>
+            <div style="line-height:2.2;font-size:20px;">
+              <div><strong>은행</strong> : ${bankName}</div>
+              <div><strong>계좌번호</strong> : ${accountNumber}</div>
+              <div><strong>예금주</strong> : ${accountHolder}</div>
+              <div><strong>계약금</strong> : ${depositCost || 0}만원</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:26px;padding:20px;border-radius:18px;background:#f9fafb;border:1px solid #d1d5db;line-height:2;font-size:15px;">
+          <div style="font-size:22px;font-weight:900;color:#0f766e;margin-bottom:12px;">유의사항</div>
+          <div>• 이사 당일 추가 인원 및 차량 요청 시 추가 비용이 발생할 수 있습니다.</div>
+          <div>• 일정 변경 및 취소는 최소 2일 전까지 연락 부탁드립니다.</div>
+          <div>• 귀중품 및 현금은 고객님께서 직접 보관 부탁드립니다.</div>
+        </div>
+      </div>
+    `
 
     document.body.appendChild(target)
     return target
   }
 
   const buildTextContractPages = () => {
-    const contractText = buildContractText()
-    const lines = contractText.split('\n')
-    const pageWidth = 794
-    const pageHeight = 1123
-    const padding = 40
-    const pages = []
-
-    const makePage = (withTitle = false) => {
-      const page = document.createElement('div')
-      page.style.width = `${pageWidth}px`
-      page.style.height = `${pageHeight}px`
-      page.style.backgroundColor = '#ffffff'
-      page.style.color = '#111827'
-      page.style.padding = `${padding}px`
-      page.style.boxSizing = 'border-box'
-      page.style.fontFamily = 'Arial, sans-serif'
-      page.style.lineHeight = '1.6'
-      page.style.overflow = 'hidden'
-
-      if (withTitle) {
-        const title = document.createElement('div')
-        title.textContent = '이사 견적 · 계약서'
-        title.style.fontSize = '28px'
-        title.style.fontWeight = '900'
-        title.style.textAlign = 'center'
-        title.style.marginBottom = '24px'
-        title.style.paddingBottom = '16px'
-        title.style.borderBottom = '2px solid #111827'
-        page.appendChild(title)
-      }
-
-      return page
-    }
-
-    const makeRow = (line) => {
-      const row = document.createElement('div')
-      row.textContent = line || ' '
-
-      if (line.startsWith('【') && line.endsWith('】')) {
-        row.style.fontSize = '18px'
-        row.style.fontWeight = '900'
-        row.style.color = '#0f766e'
-        row.style.marginTop = '18px'
-        row.style.marginBottom = '8px'
-        row.style.paddingBottom = '4px'
-        row.style.borderBottom = '1px solid #d1d5db'
-      } else {
-        row.style.fontSize = '15px'
-        row.style.fontWeight = '600'
-        row.style.color = '#111827'
-        row.style.marginBottom = '4px'
-        row.style.whiteSpace = 'pre-wrap'
-        row.style.wordBreak = 'break-word'
-      }
-
-      return row
-    }
-
     const wrapper = document.createElement('div')
     wrapper.style.position = 'fixed'
     wrapper.style.left = '-10000px'
     wrapper.style.top = '0'
-    wrapper.style.backgroundColor = '#ffffff'
-    document.body.appendChild(wrapper)
 
-    let currentPage = makePage(true)
-    wrapper.appendChild(currentPage)
-    pages.push(currentPage)
+    const page = buildStyledContractElement()
+    wrapper.appendChild(page)
 
-    lines.forEach((line) => {
-      const row = makeRow(line)
-      currentPage.appendChild(row)
-
-      if (currentPage.scrollHeight > pageHeight) {
-        currentPage.removeChild(row)
-        currentPage = makePage(false)
-        wrapper.appendChild(currentPage)
-        pages.push(currentPage)
-        currentPage.appendChild(row)
-      }
-    })
-
-    const noticeLines = [
-      '※ 계약금 10% 납입 시 계약 확정',
-      '※ 카드 및 현금영수증 발행 시 부가세 10% 별도',
-      '※ 견적 외 추가 물품 발생 시 추가 비용 발생 가능',
-    ]
-
-    const notice = document.createElement('div')
-    notice.style.marginTop = '28px'
-    notice.style.paddingTop = '14px'
-    notice.style.borderTop = '1px solid #d1d5db'
-    notice.style.fontSize = '12px'
-    notice.style.color = '#4b5563'
-    notice.style.lineHeight = '1.8'
-    notice.innerHTML = noticeLines.join('<br />')
-    currentPage.appendChild(notice)
-
-    if (currentPage.scrollHeight > pageHeight) {
-      currentPage.removeChild(notice)
-      currentPage = makePage(false)
-      wrapper.appendChild(currentPage)
-      pages.push(currentPage)
-      currentPage.appendChild(notice)
-    }
-
-    return { wrapper, pages }
+    return { wrapper, pages: [page] }
   }
 
   const handleImageDownload = async () => {
@@ -560,7 +508,7 @@ END:VCALENDAR`
 
     try {
       if (document.fonts?.ready) await document.fonts.ready
-      imageTarget = buildTextContractElement()
+      imageTarget = buildStyledContractElement()
 
       const canvas = await html2canvas(imageTarget, {
         scale: 2,
