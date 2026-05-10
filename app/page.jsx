@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 import { initializeApp, getApps } from 'firebase/app'
-import { addDoc, collection, getDocs, getFirestore, orderBy, query } from 'firebase/firestore'
+import { addDoc, collection, doc, getDocs, getFirestore, orderBy, query, updateDoc } from 'firebase/firestore'
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAiPL2H2Hd1VpQ5DgZHeXxpYa94jxFyOjs',
@@ -194,6 +194,7 @@ const styles = {
 }
 
 const optionNames = ['없음', '벽걸이 TV', '돌침대', '조립장농', '피아노', '날짜옵션', '이동거리', '이사작업지연', '보관비용', '기타']
+const ADMIN_PASSWORD = '8210'
 
 export default function MovingContractApp() {
   const contractRef = useRef(null)
@@ -246,6 +247,9 @@ export default function MovingContractApp() {
   const [saveStatus, setSaveStatus] = useState('')
   const [isSavedListOpen, setIsSavedListOpen] = useState(false)
   const [selectedContractId, setSelectedContractId] = useState(null)
+  const [adminPasswordInput, setAdminPasswordInput] = useState('')
+  const [isAdminMode, setIsAdminMode] = useState(false)
+  const [adminStatus, setAdminStatus] = useState('')
 
   const totalCost = (Number(baseCost) || 0) + (Number(optionCost) || 0) + (Number(ladderCost) || 0)
   const balanceCost = totalCost - (Number(depositCost) || 0)
@@ -688,10 +692,59 @@ END:VCALENDAR`
     try {
       const q = query(collection(db, 'contracts'), orderBy('createdAt', 'desc'))
       const snapshot = await getDocs(q)
-      const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      const list = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((item) => !item.isDeleted)
       setSavedContracts(list)
     } catch (error) {
       console.error('계약서 조회 오류:', error)
+    }
+  }
+
+  const enterAdminMode = () => {
+    if (adminPasswordInput === ADMIN_PASSWORD) {
+      setIsAdminMode(true)
+      setAdminPasswordInput('')
+      setAdminStatus('관리자 모드가 켜졌습니다.')
+      return
+    }
+
+    setAdminStatus('비밀번호가 맞지 않습니다.')
+  }
+
+  const exitAdminMode = () => {
+    setIsAdminMode(false)
+    setAdminPasswordInput('')
+    setAdminStatus('관리자 모드가 꺼졌습니다.')
+  }
+
+  const softDeleteContract = async (item) => {
+    const firstConfirm = window.confirm(`정말 삭제하시겠습니까?
+
+고객명: ${item.customerName || '고객명 없음'}
+연락처: ${item.customerPhone || '연락처 없음'}
+
+삭제 후 일반 목록에서는 보이지 않습니다.`)
+    if (!firstConfirm) return
+
+    const typed = window.prompt('실수 방지를 위해 "삭제" 라고 입력해 주세요.')
+    if (typed !== '삭제') {
+      setAdminStatus('삭제가 취소되었습니다. 정확히 "삭제" 라고 입력해야 합니다.')
+      return
+    }
+
+    try {
+      await updateDoc(doc(db, 'contracts', item.id), {
+        isDeleted: true,
+        deletedAt: new Date().toISOString(),
+      })
+
+      setAdminStatus('계약서가 삭제 처리되었습니다. Firebase에는 휴지통 상태로 보관됩니다.')
+      if (selectedContractId === item.id) setSelectedContractId(null)
+      await loadContracts()
+    } catch (error) {
+      console.error('계약서 삭제 오류:', error)
+      setAdminStatus('삭제 처리에 실패했습니다.')
     }
   }
 
@@ -973,6 +1026,29 @@ END:VCALENDAR`
                 저장 목록 새로고침
               </button>
 
+              <div style={{ border: '1px solid #d1d5db', borderRadius: 12, padding: 12, background: '#f9fafb', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ fontWeight: 900, color: '#111827' }}>관리자 모드</div>
+                {!isAdminMode ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
+                    <input
+                      type="password"
+                      value={adminPasswordInput}
+                      onChange={(e) => setAdminPasswordInput(e.target.value)}
+                      style={styles.input}
+                      placeholder="관리자 비밀번호"
+                    />
+                    <button type="button" onClick={enterAdminMode} style={{ ...styles.button, width: 'auto', padding: '12px 16px', background: '#111827', color: '#ffffff' }}>
+                      확인
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={exitAdminMode} style={{ ...styles.button, background: '#ef4444', color: '#ffffff' }}>
+                    관리자 모드 끄기
+                  </button>
+                )}
+                {adminStatus && <div style={{ color: isAdminMode ? '#0f766e' : '#b45309', fontSize: 13, fontWeight: 800 }}>{adminStatus}</div>}
+              </div>
+
               <div
                 style={{
                   display: 'flex',
@@ -1025,6 +1101,16 @@ END:VCALENDAR`
                           >
                             이 계약서 불러오기
                           </button>
+
+                          {isAdminMode && (
+                            <button
+                              type="button"
+                              onClick={() => softDeleteContract(item)}
+                              style={{ ...styles.button, marginTop: 8, background: '#dc2626', color: '#ffffff' }}
+                            >
+                              관리자 삭제
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
