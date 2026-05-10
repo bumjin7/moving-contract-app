@@ -451,7 +451,7 @@ END:VCALENDAR`
     const makePage = (withTitle = false) => {
       const page = document.createElement('div')
       page.style.width = `${pageWidth}px`
-      page.style.minHeight = `${pageHeight}px`
+      page.style.height = `${pageHeight}px`
       page.style.backgroundColor = '#ffffff'
       page.style.color = '#111827'
       page.style.padding = `${padding}px`
@@ -514,7 +514,7 @@ END:VCALENDAR`
       const row = makeRow(line)
       currentPage.appendChild(row)
 
-      if (currentPage.scrollHeight > pageHeight - 20) {
+      if (currentPage.scrollHeight > pageHeight) {
         currentPage.removeChild(row)
         currentPage = makePage(false)
         wrapper.appendChild(currentPage)
@@ -539,7 +539,7 @@ END:VCALENDAR`
     notice.innerHTML = noticeLines.join('<br />')
     currentPage.appendChild(notice)
 
-    if (currentPage.scrollHeight > pageHeight - 20) {
+    if (currentPage.scrollHeight > pageHeight) {
       currentPage.removeChild(notice)
       currentPage = makePage(false)
       wrapper.appendChild(currentPage)
