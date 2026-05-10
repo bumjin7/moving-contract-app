@@ -389,7 +389,7 @@ END:VCALENDAR`
     target.style.background = '#ffffff'
     target.style.borderRadius = '24px'
     target.style.overflow = 'hidden'
-    target.style.fontFamily = 'Arial, sans-serif'
+    target.style.fontFamily = `'Pretendard', 'SUIT', 'Apple SD Gothic Neo', 'Malgun Gothic', Arial, sans-serif`
     target.style.color = '#111827'
     target.style.boxShadow = '0 10px 40px rgba(0,0,0,0.12)'
 
@@ -397,22 +397,26 @@ END:VCALENDAR`
 
     target.innerHTML = `
       <div style="padding:40px;border-top:10px solid #14b8a6;background:#ffffff;position:relative;overflow:hidden;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;">
-          <div>
-            <div style="font-size:56px;font-weight:900;color:#14b8a6;letter-spacing:-3px;line-height:1;">두근두근이사</div>
-            <div style="margin-top:10px;font-size:18px;color:#6b7280;font-weight:700;">마음까지 옮기는 행복한 이사</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;position:relative;">
+          <div style="width:520px;">
+            <img src="/logo.png" style="width:500px;height:auto;display:block;" />
+            <div style="margin-top:6px;font-size:18px;color:#6b7280;font-weight:800;letter-spacing:8px;text-align:center;">마음까지 옮기는 행복한 이사</div>
           </div>
 
-          <div style="font-size:90px;opacity:0.15;">🚚</div>
+          <div style="width:250px;text-align:right;padding-top:18px;">
+            <img src="/truck.png" style="width:220px;height:auto;object-fit:contain;" />
+          </div>
         </div>
+
+        <div style="height:8px;background:#0f9f9a;margin:0 -40px 34px -40px;"></div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;gap:20px;">
           <div>
-            <div style="font-size:52px;font-weight:900;color:#0f766e;letter-spacing:8px;">이 사 계 약 서</div>
+            <div style="font-size:54px;font-weight:900;color:#0f766e;letter-spacing:14px;font-family:'Apple SD Gothic Neo','Malgun Gothic',serif;">이 사 계 약 서</div>
             <div style="margin-top:10px;font-size:18px;color:#6b7280;font-weight:700;">고객님의 소중한 이사를 책임지겠습니다.</div>
           </div>
 
-          <div style="border:2px solid #99f6e4;border-radius:16px;padding:16px 20px;min-width:230px;background:#f0fdfa;">
+          <div style="border:2px solid #99f6e4;border-radius:16px;padding:14px 18px;min-width:220px;background:#f0fdfa;">
             <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:15px;">
               <strong style="color:#0f766e;">계약일자</strong>
               <span>${today}</span>
@@ -424,7 +428,11 @@ END:VCALENDAR`
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div style="position:absolute;left:360px;top:470px;opacity:0.055;z-index:0;">
+          <img src="/truck.png" style="width:420px;height:auto;" />
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;position:relative;z-index:1;">
           <div style="border:2px solid #ccfbf1;border-radius:18px;padding:20px;background:#ffffff;">
             <div style="font-size:24px;font-weight:900;color:#0f766e;margin-bottom:16px;">고객 정보</div>
             <div style="line-height:2;font-size:17px;">
@@ -448,14 +456,14 @@ END:VCALENDAR`
           </div>
         </div>
 
-        <div style="margin-top:24px;border:2px solid #99f6e4;border-radius:18px;padding:24px;background:#f0fdfa;">
+        <div style="margin-top:24px;border:2px solid #99f6e4;border-radius:18px;padding:24px;background:#f0fdfa;position:relative;z-index:1;">
           <div style="font-size:26px;font-weight:900;color:#0f766e;margin-bottom:16px;">견적 금액</div>
           <div style="font-size:52px;font-weight:900;color:#14b8a6;margin-bottom:10px;">${totalCost.toLocaleString()}만원</div>
           <div style="font-size:16px;color:#374151;font-weight:700;">기본비용 ${baseCost || 0}만원 / 옵션 ${optionCost || 0}만원 / 사다리차 ${ladderCost || 0}만원</div>
           <div style="margin-top:10px;font-size:15px;color:#dc2626;font-weight:800;">※ 카드결제 및 현금영수증 발행 시 부가세 별도</div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;position:relative;z-index:1;">
           <div style="border:2px solid #d1d5db;border-radius:18px;padding:20px;background:#ffffff;">
             <div style="font-size:24px;font-weight:900;color:#0f766e;margin-bottom:16px;">옵션 및 요청사항</div>
             <div style="white-space:pre-wrap;line-height:1.9;font-size:16px;">
@@ -477,11 +485,16 @@ ${customerMemo || '-'}
           </div>
         </div>
 
-        <div style="margin-top:26px;padding:20px;border-radius:18px;background:#f9fafb;border:1px solid #d1d5db;line-height:2;font-size:15px;">
+        <div style="margin-top:26px;padding:20px;border-radius:18px;background:#f9fafb;border:1px solid #d1d5db;line-height:2;font-size:15px;position:relative;z-index:1;">
           <div style="font-size:22px;font-weight:900;color:#0f766e;margin-bottom:12px;">유의사항</div>
           <div>• 이사 당일 추가 인원 및 차량 요청 시 추가 비용이 발생할 수 있습니다.</div>
           <div>• 일정 변경 및 취소는 최소 2일 전까지 연락 부탁드립니다.</div>
           <div>• 귀중품 및 현금은 고객님께서 직접 보관 부탁드립니다.</div>
+        </div>
+      
+        <div style="margin:30px -40px -40px -40px;background:#0f9f9a;color:#ffffff;padding:18px 40px;display:flex;justify-content:space-between;align-items:center;font-size:17px;font-weight:700;">
+          <div>♡ 고객님의 만족이 저희의 가장 큰 기쁨입니다. 항상 최선을 다하는 두근두근 이사가 되겠습니다.</div>
+          <div style="font-size:28px;font-weight:900;letter-spacing:4px;">감사합니다 ♡</div>
         </div>
       </div>
     `
