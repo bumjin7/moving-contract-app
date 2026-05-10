@@ -244,6 +244,8 @@ export default function MovingContractApp() {
   const [savedContracts, setSavedContracts] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [saveStatus, setSaveStatus] = useState('')
+  const [isSavedListOpen, setIsSavedListOpen] = useState(false)
+  const [selectedContractId, setSelectedContractId] = useState(null)
 
   const totalCost = (Number(baseCost) || 0) + (Number(optionCost) || 0) + (Number(ladderCost) || 0)
   const balanceCost = totalCost - (Number(depositCost) || 0)
@@ -374,38 +376,189 @@ END:VCALENDAR`
     downloadTextFile(`${customerName || '이사일정'}.ics`, icsContent, 'text/calendar;charset=utf-8')
   }
 
-  const prepareCaptureElement = () => {
-    if (!contractRef.current) return null
+  const buildTextContractElement = () => {
+    const contractText = buildContractText()
+    const lines = contractText.split('\n')
 
-    const clone = contractRef.current.cloneNode(true)
-    clone.querySelectorAll('[data-capture-ignore="true"]').forEach((el) => el.remove())
-    clone.querySelectorAll('*').forEach((el) => {
-      el.style.color = '#111827'
-      el.style.borderColor = '#9ca3af'
-      el.style.backgroundColor = el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' ? '#ffffff' : '#ffffff'
-      el.style.boxShadow = 'none'
+    const target = document.createElement('div')
+    target.style.position = 'fixed'
+    target.style.left = '-10000px'
+    target.style.top = '0'
+    target.style.width = '794px'
+    target.style.backgroundColor = '#ffffff'
+    target.style.color = '#111827'
+    target.style.padding = '40px'
+    target.style.boxSizing = 'border-box'
+    target.style.fontFamily = 'Arial, sans-serif'
+    target.style.lineHeight = '1.6'
+
+    const title = document.createElement('div')
+    title.textContent = '이사 견적 · 계약서'
+    title.style.fontSize = '28px'
+    title.style.fontWeight = '900'
+    title.style.textAlign = 'center'
+    title.style.marginBottom = '24px'
+    title.style.paddingBottom = '16px'
+    title.style.borderBottom = '2px solid #111827'
+    target.appendChild(title)
+
+    lines.forEach((line) => {
+      const row = document.createElement('div')
+      row.textContent = line || ' '
+
+      if (line.startsWith('【') && line.endsWith('】')) {
+        row.style.fontSize = '18px'
+        row.style.fontWeight = '900'
+        row.style.color = '#0f766e'
+        row.style.marginTop = '18px'
+        row.style.marginBottom = '8px'
+        row.style.paddingBottom = '4px'
+        row.style.borderBottom = '1px solid #d1d5db'
+      } else {
+        row.style.fontSize = '15px'
+        row.style.fontWeight = '600'
+        row.style.color = '#111827'
+        row.style.marginBottom = '4px'
+        row.style.whiteSpace = 'pre-wrap'
+        row.style.wordBreak = 'break-word'
+      }
+
+      target.appendChild(row)
     })
 
-    clone.style.position = 'fixed'
-    clone.style.left = '-10000px'
-    clone.style.top = '0'
-    clone.style.width = `${contractRef.current.offsetWidth}px`
-    clone.style.backgroundColor = '#ffffff'
-    clone.style.color = '#111827'
-    clone.style.boxShadow = 'none'
-    document.body.appendChild(clone)
-    return clone
+    const notice = document.createElement('div')
+    notice.style.marginTop = '28px'
+    notice.style.paddingTop = '14px'
+    notice.style.borderTop = '1px solid #d1d5db'
+    notice.style.fontSize = '12px'
+    notice.style.color = '#4b5563'
+    notice.style.lineHeight = '1.8'
+    notice.innerHTML = '※ 계약금 10% 납입 시 계약 확정<br />※ 카드 및 현금영수증 발행 시 부가세 10% 별도<br />※ 견적 외 추가 물품 발생 시 추가 비용 발생 가능'
+    target.appendChild(notice)
+
+    document.body.appendChild(target)
+    return target
+  }
+
+  const buildTextContractPages = () => {
+    const contractText = buildContractText()
+    const lines = contractText.split('\n')
+    const pageWidth = 794
+    const pageHeight = 1123
+    const padding = 40
+    const pages = []
+
+    const makePage = (withTitle = false) => {
+      const page = document.createElement('div')
+      page.style.width = `${pageWidth}px`
+      page.style.minHeight = `${pageHeight}px`
+      page.style.backgroundColor = '#ffffff'
+      page.style.color = '#111827'
+      page.style.padding = `${padding}px`
+      page.style.boxSizing = 'border-box'
+      page.style.fontFamily = 'Arial, sans-serif'
+      page.style.lineHeight = '1.6'
+      page.style.overflow = 'hidden'
+
+      if (withTitle) {
+        const title = document.createElement('div')
+        title.textContent = '이사 견적 · 계약서'
+        title.style.fontSize = '28px'
+        title.style.fontWeight = '900'
+        title.style.textAlign = 'center'
+        title.style.marginBottom = '24px'
+        title.style.paddingBottom = '16px'
+        title.style.borderBottom = '2px solid #111827'
+        page.appendChild(title)
+      }
+
+      return page
+    }
+
+    const makeRow = (line) => {
+      const row = document.createElement('div')
+      row.textContent = line || ' '
+
+      if (line.startsWith('【') && line.endsWith('】')) {
+        row.style.fontSize = '18px'
+        row.style.fontWeight = '900'
+        row.style.color = '#0f766e'
+        row.style.marginTop = '18px'
+        row.style.marginBottom = '8px'
+        row.style.paddingBottom = '4px'
+        row.style.borderBottom = '1px solid #d1d5db'
+      } else {
+        row.style.fontSize = '15px'
+        row.style.fontWeight = '600'
+        row.style.color = '#111827'
+        row.style.marginBottom = '4px'
+        row.style.whiteSpace = 'pre-wrap'
+        row.style.wordBreak = 'break-word'
+      }
+
+      return row
+    }
+
+    const wrapper = document.createElement('div')
+    wrapper.style.position = 'fixed'
+    wrapper.style.left = '-10000px'
+    wrapper.style.top = '0'
+    wrapper.style.backgroundColor = '#ffffff'
+    document.body.appendChild(wrapper)
+
+    let currentPage = makePage(true)
+    wrapper.appendChild(currentPage)
+    pages.push(currentPage)
+
+    lines.forEach((line) => {
+      const row = makeRow(line)
+      currentPage.appendChild(row)
+
+      if (currentPage.scrollHeight > pageHeight - 20) {
+        currentPage.removeChild(row)
+        currentPage = makePage(false)
+        wrapper.appendChild(currentPage)
+        pages.push(currentPage)
+        currentPage.appendChild(row)
+      }
+    })
+
+    const noticeLines = [
+      '※ 계약금 10% 납입 시 계약 확정',
+      '※ 카드 및 현금영수증 발행 시 부가세 10% 별도',
+      '※ 견적 외 추가 물품 발생 시 추가 비용 발생 가능',
+    ]
+
+    const notice = document.createElement('div')
+    notice.style.marginTop = '28px'
+    notice.style.paddingTop = '14px'
+    notice.style.borderTop = '1px solid #d1d5db'
+    notice.style.fontSize = '12px'
+    notice.style.color = '#4b5563'
+    notice.style.lineHeight = '1.8'
+    notice.innerHTML = noticeLines.join('<br />')
+    currentPage.appendChild(notice)
+
+    if (currentPage.scrollHeight > pageHeight - 20) {
+      currentPage.removeChild(notice)
+      currentPage = makePage(false)
+      wrapper.appendChild(currentPage)
+      pages.push(currentPage)
+      currentPage.appendChild(notice)
+    }
+
+    return { wrapper, pages }
   }
 
   const handleImageDownload = async () => {
-    setPdfStatus('이미지 생성 중입니다. 잠시만 기다려 주세요.')
-    let captureTarget = null
+    setPdfStatus('텍스트 이미지 생성 중입니다. 잠시만 기다려 주세요.')
+    let imageTarget = null
 
     try {
-      captureTarget = prepareCaptureElement()
-      if (!captureTarget) return
+      if (document.fonts?.ready) await document.fonts.ready
+      imageTarget = buildTextContractElement()
 
-      const canvas = await html2canvas(captureTarget, {
+      const canvas = await html2canvas(imageTarget, {
         scale: 2,
         backgroundColor: '#ffffff',
         useCORS: true,
@@ -416,106 +569,38 @@ END:VCALENDAR`
       link.href = image
       link.download = `${customerName || '고객'}_이사계약서.png`
       link.click()
-      setPdfStatus('이미지 파일이 생성되었습니다.')
+      setPdfStatus('텍스트 이미지 파일이 생성되었습니다.')
     } catch (error) {
       console.error('이미지 생성 오류:', error)
       setPdfStatus('이미지 생성에 실패했습니다. 새로고침 후 다시 시도해 주세요.')
     } finally {
-      if (captureTarget) captureTarget.remove()
+      if (imageTarget) imageTarget.remove()
     }
   }
 
   const handlePdfDownload = async () => {
     setPdfStatus('텍스트 계약서 PDF 생성 중입니다. 잠시만 기다려 주세요.')
-    let pdfTarget = null
+    let result = null
 
     try {
       if (document.fonts?.ready) await document.fonts.ready
+      result = buildTextContractPages()
 
-      const contractText = buildContractText()
-      const lines = contractText.split('\n')
-
-      pdfTarget = document.createElement('div')
-      pdfTarget.style.position = 'fixed'
-      pdfTarget.style.left = '-10000px'
-      pdfTarget.style.top = '0'
-      pdfTarget.style.width = '794px'
-      pdfTarget.style.backgroundColor = '#ffffff'
-      pdfTarget.style.color = '#111827'
-      pdfTarget.style.padding = '40px'
-      pdfTarget.style.boxSizing = 'border-box'
-      pdfTarget.style.fontFamily = 'Arial, sans-serif'
-      pdfTarget.style.lineHeight = '1.6'
-
-      const title = document.createElement('div')
-      title.textContent = '이사 견적 · 계약서'
-      title.style.fontSize = '28px'
-      title.style.fontWeight = '900'
-      title.style.textAlign = 'center'
-      title.style.marginBottom = '24px'
-      title.style.paddingBottom = '16px'
-      title.style.borderBottom = '2px solid #111827'
-      pdfTarget.appendChild(title)
-
-      lines.forEach((line) => {
-        const row = document.createElement('div')
-        row.textContent = line || ' '
-
-        if (line.startsWith('【') && line.endsWith('】')) {
-          row.style.fontSize = '18px'
-          row.style.fontWeight = '900'
-          row.style.color = '#0f766e'
-          row.style.marginTop = '18px'
-          row.style.marginBottom = '8px'
-          row.style.paddingBottom = '4px'
-          row.style.borderBottom = '1px solid #d1d5db'
-        } else {
-          row.style.fontSize = '15px'
-          row.style.fontWeight = '600'
-          row.style.color = '#111827'
-          row.style.marginBottom = '4px'
-          row.style.whiteSpace = 'pre-wrap'
-        }
-
-        pdfTarget.appendChild(row)
-      })
-
-      const notice = document.createElement('div')
-      notice.style.marginTop = '28px'
-      notice.style.paddingTop = '14px'
-      notice.style.borderTop = '1px solid #d1d5db'
-      notice.style.fontSize = '12px'
-      notice.style.color = '#4b5563'
-      notice.style.lineHeight = '1.8'
-      notice.innerHTML = '※ 계약금 10% 납입 시 계약 확정<br />※ 카드 및 현금영수증 발행 시 부가세 10% 별도<br />※ 견적 외 추가 물품 발생 시 추가 비용 발생 가능'
-      pdfTarget.appendChild(notice)
-
-      document.body.appendChild(pdfTarget)
-
-      const canvas = await html2canvas(pdfTarget, {
-        scale: 2,
-        backgroundColor: '#ffffff',
-        useCORS: true,
-      })
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.95)
       const pdf = new jsPDF('p', 'mm', 'a4')
       const pageWidth = pdf.internal.pageSize.getWidth()
       const pageHeight = pdf.internal.pageSize.getHeight()
-      const imgWidth = pageWidth
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
 
-      let heightLeft = imgHeight
-      let position = 0
+      for (let i = 0; i < result.pages.length; i += 1) {
+        const canvas = await html2canvas(result.pages[i], {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          useCORS: true,
+        })
 
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight
+        const imgData = canvas.toDataURL('image/jpeg', 0.95)
 
-      while (heightLeft > 0) {
-        position -= pageHeight
-        pdf.addPage()
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight
+        if (i > 0) pdf.addPage()
+        pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight)
       }
 
       pdf.save(`${customerName || '고객'}_이사계약서.pdf`)
@@ -524,7 +609,7 @@ END:VCALENDAR`
       console.error('PDF 생성 오류:', error)
       setPdfStatus('PDF 생성에 실패했습니다. 새로고침 후 다시 시도해 주세요.')
     } finally {
-      if (pdfTarget) pdfTarget.remove()
+      if (result?.wrapper) result.wrapper.remove()
     }
   }
 
@@ -654,6 +739,52 @@ END:VCALENDAR`
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(keyword))
   })
+
+  const buildSavedContractDetailText = (item) => {
+    const savedOptions = (item.optionItems || [])
+      .filter((option) => option.name !== '없음' || option.price !== '없음')
+      .map((option, index) => `옵션 ${index + 1}: ${option.name || '없음'} / ${option.price || '없음'}`)
+      .join('\n')
+
+    return [
+      '【고객 정보】',
+      `고객명: ${item.customerName || '-'}`,
+      `연락처: ${item.customerPhone || '-'}`,
+      '',
+      '【주소 및 일정】',
+      `출발지: ${item.startAddress || '-'}`,
+      `도착지: ${item.endAddress || '-'}`,
+      `경유지: ${item.stopover || '-'}`,
+      `포장일: ${item.packingDate || '-'}`,
+      `운반일: ${item.moveDate || '-'}`,
+      `시작시간: ${item.startHour || '08'}시 ${item.startMinute || '00'}분`,
+      '',
+      '【계약 정보】',
+      `계약상품: ${item.moveTypes?.length ? item.moveTypes.join(', ') : '-'}`,
+      `보관기간: ${item.moveTypes?.includes('보관이사') ? item.storageDays : '-'}`,
+      `주거형태: ${item.houseTypes?.length ? item.houseTypes.join(', ') : '-'}`,
+      `작업용량: ${item.workVolume || '-'}`,
+      `출발지 운반수단: ${item.startCarryMethod || '-'} / ${item.startFloor || '-'}`,
+      `도착지 운반수단: ${item.endCarryMethod || '-'} / ${item.endFloor || '-'}`,
+      `작업인원: 남 ${item.maleWorkers || '0명'}, 여 ${item.femaleWorkers || '0명'}`,
+      '',
+      '【옵션 및 추가비용】',
+      savedOptions || '-',
+      '',
+      '【견적 금액】',
+      `기본 이사비용: ${item.baseCost || 0}만원`,
+      `옵션 비용: ${item.optionCost || 0}만원`,
+      `사다리차 비용: ${item.ladderCost || 0}만원`,
+      `총 견적금액: ${item.totalCost || 0}만원`,
+      `계약금: ${item.depositCost || 0}만원`,
+      `잔금: ${item.balanceCost || 0}만원`,
+      '',
+      '【비고 및 요청사항】',
+      `고객 요청 및 주의사항: ${item.customerMemo || '-'}`,
+      `견적 제외 품목: ${item.excludedItems || '-'}`,
+      `기타 메모: ${item.etcMemo || '-'}`,
+    ].join('\n')
+  }
 
   useEffect(() => {
     loadContracts()
@@ -812,48 +943,102 @@ END:VCALENDAR`
         </section>
 
         <section data-capture-ignore="true" style={styles.section}>
-          <h2 style={styles.sectionTitle}>저장된 계약서 조회</h2>
-
-          <input
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={styles.input}
-            placeholder="고객명, 연락처, 주소, 날짜로 검색"
-          />
-
-          <button type="button" onClick={loadContracts} style={{ ...styles.button, background: '#6b7280', color: '#ffffff' }}>
-            저장 목록 새로고침
+          <button
+            type="button"
+            onClick={() => setIsSavedListOpen((prev) => !prev)}
+            style={{
+              ...styles.button,
+              background: '#ffffff',
+              color: '#111827',
+              border: '1px solid #9ca3af',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>저장된 계약서 조회</span>
+            <span>{isSavedListOpen ? '접기 ▲' : '펼치기 ▼'}</span>
           </button>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {filteredContracts.length === 0 ? (
-              <div style={{ border: '1px solid #d1d5db', borderRadius: 12, padding: 12, background: '#ffffff', color: '#6b7280', fontWeight: 700 }}>
-                저장된 계약서가 없습니다.
+          {isSavedListOpen && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={styles.input}
+                placeholder="고객명, 연락처, 주소, 날짜로 검색"
+              />
+
+              <button type="button" onClick={loadContracts} style={{ ...styles.button, background: '#6b7280', color: '#ffffff' }}>
+                저장 목록 새로고침
+              </button>
+
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                  maxHeight: 430,
+                  overflowY: 'auto',
+                  paddingRight: 4,
+                }}
+              >
+                {filteredContracts.length === 0 ? (
+                  <div style={{ border: '1px solid #d1d5db', borderRadius: 12, padding: 12, background: '#ffffff', color: '#6b7280', fontWeight: 700 }}>
+                    저장된 계약서가 없습니다.
+                  </div>
+                ) : (
+                  filteredContracts.map((item, index) => (
+                    <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedContractId((prev) => (prev === item.id ? null : item.id))}
+                        style={{
+                          textAlign: 'left',
+                          border: '1px solid #d1d5db',
+                          borderRadius: 12,
+                          padding: 12,
+                          background: index < 5 ? '#ffffff' : '#f9fafb',
+                          color: '#111827',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                          <div style={{ fontWeight: 900, fontSize: 16 }}>{item.customerName || '고객명 없음'}</div>
+                          <div style={{ fontWeight: 800, color: '#0f766e' }}>{selectedContractId === item.id ? '상세 접기 ▲' : '상세 보기 ▼'}</div>
+                        </div>
+                        <div style={{ fontWeight: 700 }}>{item.customerPhone || '연락처 없음'}</div>
+                        <div>{item.moveDate || '운반일 없음'}</div>
+                        <div style={{ color: '#6b7280', fontSize: 13 }}>{item.startAddress || '-'} → {item.endAddress || '-'}</div>
+                      </button>
+
+                      {selectedContractId === item.id && (
+                        <div style={{ border: '1px solid #99f6e4', borderRadius: 12, padding: 12, background: '#f0fdfa' }}>
+                          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'Arial, sans-serif', fontSize: 14, lineHeight: 1.6, color: '#111827' }}>
+                            {buildSavedContractDetailText(item)}
+                          </pre>
+
+                          <button
+                            type="button"
+                            onClick={() => loadContractToForm(item)}
+                            style={{ ...styles.button, marginTop: 12, background: '#0f766e', color: '#ffffff' }}
+                          >
+                            이 계약서 불러오기
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
-            ) : (
-              filteredContracts.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => loadContractToForm(item)}
-                  style={{
-                    textAlign: 'left',
-                    border: '1px solid #d1d5db',
-                    borderRadius: 12,
-                    padding: 12,
-                    background: '#ffffff',
-                    color: '#111827',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div style={{ fontWeight: 900, fontSize: 16 }}>{item.customerName || '고객명 없음'}</div>
-                  <div style={{ fontWeight: 700 }}>{item.customerPhone || '연락처 없음'}</div>
-                  <div>{item.moveDate || '운반일 없음'}</div>
-                  <div style={{ color: '#6b7280', fontSize: 13 }}>{item.startAddress || '-'} → {item.endAddress || '-'}</div>
-                </button>
-              ))
-            )}
-          </div>
+
+              {filteredContracts.length > 5 && (
+                <div style={{ color: '#6b7280', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>
+                  총 {filteredContracts.length}개 중 5개 높이만 표시됩니다. 아래로 스크롤해서 더 볼 수 있습니다.
+                </div>
+              )}
+            </div>
+          )}
         </section>
 
         <div style={styles.helperText}>
