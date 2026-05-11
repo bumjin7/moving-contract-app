@@ -380,6 +380,39 @@ END:VCALENDAR`
     downloadTextFile(`${customerName || '이사일정'}.ics`, icsContent, 'text/calendar;charset=utf-8')
   }
 
+  const getSelectedOptionLabels = () => {
+    const names = optionItems
+      .slice(0, optionCount)
+      .filter((option) => option.name && option.name !== '없음')
+      .map((option) => option.name)
+
+    return names.length ? Array.from(new Set(names)).join(', ') : '없음'
+  }
+
+  const escapeHtml = (value) => {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+  }
+
+  const waitForImagesInElement = async (element) => {
+    const images = Array.from(element.querySelectorAll('img'))
+
+    await Promise.all(
+      images.map((img) => {
+        if (img.complete) return Promise.resolve()
+
+        return new Promise((resolve) => {
+          img.onload = resolve
+          img.onerror = resolve
+        })
+      }),
+    )
+  }
+
   const buildStyledContractElement = () => {
     const target = document.createElement('div')
     target.style.position = 'fixed'
@@ -387,118 +420,416 @@ END:VCALENDAR`
     target.style.top = '0'
     target.style.width = '900px'
     target.style.background = '#ffffff'
-    target.style.borderRadius = '22px'
+    target.style.borderRadius = '24px'
     target.style.overflow = 'hidden'
-    target.style.fontFamily = `'Pretendard', 'SUIT', 'Apple SD Gothic Neo', 'Malgun Gothic', Arial, sans-serif`
+    target.style.fontFamily = `'Pretendard', 'SUIT', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif`
     target.style.color = '#111827'
     target.style.boxShadow = '0 10px 40px rgba(0,0,0,0.12)'
 
     const today = new Date().toLocaleDateString('ko-KR')
-    const visibleOptions = getVisibleOptionsText(true) || '옵션 없음'
+
+    const customerNameText = escapeHtml(customerName || '')
+    const customerPhoneText = escapeHtml(customerPhone || '')
+    const startAddressText = escapeHtml(startAddress || '')
+    const endAddressText = escapeHtml(endAddress || '')
+    const packingDateText = escapeHtml(packingDate || '')
+    const startTimeText = packingDate ? `${escapeHtml(startHour)}시 ${escapeHtml(startMinute)}분` : ''
+    const moveTypesText = escapeHtml(moveTypes.length ? moveTypes.join(', ') : '')
+    const workVolumeText = escapeHtml(workVolume || '')
+    const maleWorkersText = escapeHtml(maleWorkers || '')
+    const femaleWorkersText = escapeHtml(femaleWorkers || '')
+    const carryText = escapeHtml(
+      `출발지 - ${startCarryMethod || '-'}${startFloor ? `(${startFloor})` : ''}
+도착지 - ${endCarryMethod || '-'}${endFloor ? `(${endFloor})` : ''}`,
+    )
+    const optionsText = escapeHtml(getSelectedOptionLabels())
+    const requestText = escapeHtml(customerMemo || '')
+    const excludedText = escapeHtml(excludedItems || '')
+    const etcMemoText = escapeHtml(etcMemo || '')
+
+    const baseCostText = Number(baseCost || 0).toLocaleString()
+    const optionCostText = Number(optionCost || 0).toLocaleString()
+    const ladderCostText = Number(ladderCost || 0).toLocaleString()
+    const totalCostText = Number(totalCost || 0).toLocaleString()
+    const depositCostText = Number(depositCost || 0).toLocaleString()
+
+    const addressHtml = (value) => {
+      const text = String(value || '')
+      if (!text) return '&nbsp;'
+
+      const fontSize = text.length >= 32 ? 13.5 : text.length >= 24 ? 14.5 : 16
+      return `<span style="font-size:${fontSize}px;line-height:1.45;word-break:break-word;">${escapeHtml(text)}</span>`
+    }
+
+    const customerRows = [
+      ['고객명', customerNameText || '&nbsp;'],
+      ['연락처', customerPhoneText || '&nbsp;'],
+      ['출발지', addressHtml(startAddress)],
+      ['도착지', addressHtml(endAddress)],
+      ['이사일시', packingDateText ? `${packingDateText}${startTimeText ? ` / ${startTimeText}` : ''}` : '&nbsp;'],
+    ]
+
+    const requestDetail =
+      `${requestText ? `고객요청 : ${requestText}` : ''}` +
+      `${requestText && excludedText ? '<br />' : ''}` +
+      `${excludedText ? `견적제외품목 : ${excludedText}` : ''}` +
+      `${etcMemoText ? `${requestText || excludedText ? '<br />' : ''}기타메모 : ${etcMemoText}` : ''}`
+
+    const contractRows = [
+      ...(moveTypes.length ? [['계약상품', moveTypesText]] : []),
+      ...(workVolumeText ? [['작업용량', workVolumeText]] : []),
+      ...((startCarryMethod || endCarryMethod) ? [['운반수단', carryText]] : []),
+      ...((maleWorkers !== '0명' || femaleWorkers !== '0명')
+        ? [['작업인원', `남자 ${maleWorkersText || '0명'} / 여자 ${femaleWorkersText || '0명'}`]]
+        : []),
+      ...(optionsText && optionsText !== '없음' ? [['옵션내용', optionsText]] : []),
+      ...(requestDetail ? [['비고 및 요청사항', requestDetail]] : []),
+    ]
+
+    const rowHtml = (label, value, isLast = false) => {
+      const valueFontSize = label === '운반수단' ? 14 : 16
+
+      return `
+      <div style="
+        display:grid;
+        grid-template-columns:118px 1fr;
+        align-items:stretch;
+        border-bottom:${isLast ? 'none' : '1px solid #d9e3e6'};
+        min-height:48px;
+      ">
+        <div style="
+          display:flex;
+          align-items:center;
+          padding:12px 14px;
+          border-right:1px solid #d9e3e6;
+          font-size:16px;
+          font-weight:900;
+          color:#0f8f8a;
+          background:#fbffff;
+        ">${label}</div>
+        <div style="
+          display:flex;
+          align-items:center;
+          padding:12px 16px;
+          font-size:${valueFontSize}px;
+          font-weight:800;
+          color:#111827;
+          line-height:${label === '운반수단' ? '1.55' : '1.65'};
+          word-break:break-word;
+          white-space:pre-wrap;
+        ">${value}</div>
+      </div>
+    `
+    }
+
+    const buildRowsHtml = (rows) =>
+      rows.map((row, index) => rowHtml(row[0], row[1], index === rows.length - 1)).join('')
+
+    const iconImgHtml = (src, alt, size = 34) => `
+      <img
+        src="${src}"
+        alt="${alt}"
+        style="
+          width:${size}px;
+          height:${size}px;
+          object-fit:contain;
+          display:block;
+          flex-shrink:0;
+        "
+      />
+    `
+
+    const sectionTitleHtml = (iconSrc, title) => `
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:10px;height:34px;">
+          <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            ${iconImgHtml(iconSrc, title, 32)}
+          </div>
+          <div style="
+            height:32px;
+            display:flex;
+            align-items:center;
+            font-size:24px;
+            font-weight:900;
+            color:#0f766e;
+            line-height:1;
+            padding-top:1px;
+          ">${title}</div>
+        </div>
+        <div style="height:2px;background:#0f9f9a;margin-top:12px;border-radius:999px;"></div>
+      </div>
+    `
+
+    const smallSectionTitleHtml = (iconSrc, title) => `
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;height:24px;">
+          <div style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            ${iconImgHtml(iconSrc, title, 22)}
+          </div>
+          <div style="
+            height:22px;
+            display:flex;
+            align-items:center;
+            font-size:17px;
+            font-weight:900;
+            color:#0f766e;
+            line-height:1;
+            padding-top:1px;
+          ">${title}</div>
+        </div>
+        <div style="height:2px;background:#0f9f9a;margin-top:10px;border-radius:999px;"></div>
+      </div>
+    `
 
     target.innerHTML = `
-      <div style="padding:34px 42px 0 42px;border-top:9px solid #14b8a6;background:#ffffff;position:relative;overflow:hidden;">
-        <div style="position:absolute;left:-80px;top:-85px;width:250px;height:250px;border-radius:999px;background:#ccfbf1;opacity:.55;"></div>
-        <div style="position:absolute;left:330px;top:500px;opacity:.045;z-index:0;">
-          <img src="/truck.png" style="width:430px;height:auto;" />
+      <div style="
+        position:relative;
+        overflow:hidden;
+        background:#ffffff;
+        padding:0 40px 0 40px;
+      ">
+        <div style="
+          position:relative;
+          z-index:2;
+          margin:0 -40px 28px -40px;
+        ">
+          <img
+            src="/header-logo.png"
+            alt="두근두근이사 상단 로고"
+            style="
+              width:100%;
+              height:auto;
+              display:block;
+            "
+          />
         </div>
 
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:26px;position:relative;z-index:1;">
-          <div style="width:430px;">
-            <img src="/logo.png" style="width:360px;height:auto;display:block;" />
-            <div style="margin-top:6px;font-size:17px;color:#6b7280;font-weight:900;letter-spacing:5px;text-align:center;width:360px;">마음까지 옮기는 행복한 이사</div>
+        <div style="
+          position:relative;
+          z-index:2;
+          display:flex;
+          justify-content:space-between;
+          align-items:flex-start;
+          gap:18px;
+          margin-bottom:22px;
+        ">
+          <div style="padding-top:6px;margin-left:70px;">
+            <img
+              src="/contract-title.png"
+              alt="이사계약서"
+              style="
+                width:430px;
+                max-width:100%;
+                height:auto;
+                display:block;
+              "
+            />
           </div>
 
-          <div style="width:240px;text-align:right;padding-top:10px;">
-            <img src="/truck.png" style="width:170px;height:auto;object-fit:contain;" />
+          <div style="
+            min-width:230px;
+            border:1px solid #9ceee2;
+            border-radius:14px;
+            background:#ffffff;
+            overflow:hidden;
+          ">
+            <div style="display:grid;grid-template-columns:82px 1fr;border-bottom:1px solid #d9e3e6;height:44px;">
+              <div style="display:flex;align-items:center;justify-content:flex-start;height:44px;line-height:1;padding:0 14px;color:#0f8f8a;font-size:15px;font-weight:900;border-right:1px solid #d9e3e6;box-sizing:border-box;">담당자</div>
+              <div style="display:flex;align-items:center;justify-content:flex-start;height:44px;line-height:1;padding:0 14px;color:#111827;font-size:15px;font-weight:900;text-align:left;box-sizing:border-box;">윤도근</div>
+            </div>
+            <div style="display:grid;grid-template-columns:82px 1fr;height:44px;">
+              <div style="display:flex;align-items:center;justify-content:flex-start;height:44px;line-height:1;padding:0 14px;color:#0f8f8a;font-size:15px;font-weight:900;border-right:1px solid #d9e3e6;box-sizing:border-box;">계약일자</div>
+              <div style="display:flex;align-items:center;justify-content:flex-start;height:44px;line-height:1;padding:0 14px;color:#111827;font-size:15px;font-weight:900;text-align:left;box-sizing:border-box;">${today}</div>
+            </div>
           </div>
         </div>
 
-        <div style="height:7px;background:#0f9f9a;margin:0 -42px 34px -42px;position:relative;z-index:1;"></div>
-
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;gap:20px;position:relative;z-index:1;">
+        <div style="
+          position:relative;
+          z-index:1;
+          display:grid;
+          grid-template-columns:1fr 1fr;
+          gap:18px;
+          margin-bottom:20px;
+        ">
           <div>
-            <div style="font-size:50px;font-weight:900;color:#0f766e;letter-spacing:14px;line-height:1.15;">이 사 계 약 서</div>
-            <div style="margin-top:8px;font-size:18px;color:#4b5563;font-weight:900;">고객님의 소중한 이사를 책임지겠습니다.</div>
-          </div>
-
-          <div style="border:2px solid #99f6e4;border-radius:16px;padding:13px 18px;min-width:210px;background:#f0fdfa;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:15px;font-weight:900;gap:24px;">
-              <strong style="color:#0f766e;">계약일자</strong>
-              <span>${today}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:900;gap:24px;">
-              <strong style="color:#0f766e;">담당자</strong>
-              <span>윤도근</span>
-            </div>
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;position:relative;z-index:1;">
-          <div style="border:2px solid #b5f5e8;border-radius:18px;padding:20px;background:#ffffff;">
-            <div style="font-size:24px;font-weight:900;color:#0f766e;margin-bottom:16px;">고객 정보</div>
-            <div style="line-height:2.05;font-size:17px;font-weight:800;">
-              <div><strong>고객명</strong> : ${customerName || '-'}</div>
-              <div><strong>연락처</strong> : ${customerPhone || '-'}</div>
-              <div><strong>출발지</strong> : ${startAddress || '-'}</div>
-              <div><strong>도착지</strong> : ${endAddress || '-'}</div>
-              <div><strong>운반일</strong> : ${moveDate || '-'}</div>
+            ${sectionTitleHtml('/icon-customer.png', '고객 정보')}
+            <div style="
+              border:1px solid #bff3ea;
+              border-radius:10px;
+              background:#ffffff;
+              overflow:hidden;
+            ">
+              ${buildRowsHtml(customerRows)}
             </div>
           </div>
 
-          <div style="border:2px solid #b5f5e8;border-radius:18px;padding:20px;background:#ffffff;">
-            <div style="font-size:24px;font-weight:900;color:#0f766e;margin-bottom:16px;">계약 정보</div>
-            <div style="line-height:2.05;font-size:17px;font-weight:800;">
-              <div><strong>계약상품</strong> : ${moveTypes.join(', ') || '-'}</div>
-              <div><strong>작업용량</strong> : ${workVolume}</div>
-              <div><strong>작업인원</strong> : 남 ${maleWorkers} / 여 ${femaleWorkers}</div>
-              <div><strong>운반수단</strong> : ${startCarryMethod} → ${endCarryMethod}</div>
-              <div><strong>경유지</strong> : ${stopover || '-'}</div>
+          <div>
+            ${sectionTitleHtml('/icon-contract.png', '계약 정보')}
+            <div style="
+              border:1px solid #bff3ea;
+              border-radius:10px;
+              background:#ffffff;
+              overflow:hidden;
+            ">
+              ${buildRowsHtml(contractRows)}
             </div>
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;position:relative;z-index:1;">
-          <div style="border:2px solid #d1d5db;border-radius:18px;padding:20px;background:#ffffff;min-height:170px;">
-            <div style="font-size:24px;font-weight:900;color:#0f766e;margin-bottom:16px;">옵션</div>
-            <div style="white-space:pre-wrap;line-height:1.9;font-size:17px;font-weight:800;">${visibleOptions}</div>
+        <div style="
+          position:relative;
+          z-index:1;
+          display:grid;
+          grid-template-columns:1fr 1fr;
+          gap:18px;
+          margin-bottom:20px;
+        ">
+          <div>
+            ${sectionTitleHtml('/icon-price.png', '견적 금액')}
+            <div style="
+              border:1px solid #9ceee2;
+              border-radius:10px;
+              background:#ffffff;
+              padding:18px 20px;
+              overflow:hidden;
+            ">
+
+            <div style="
+              display:flex;
+              align-items:baseline;
+              gap:10px;
+              margin-bottom:18px;
+            ">
+              <div style="
+                font-size:23px;
+                font-weight:900;
+                color:#0f766e;
+              ">총 견적금액</div>
+              <div style="
+                font-size:24px;
+                font-weight:900;
+                color:#14b8a6;
+              ">${totalCostText}만원</div>
+            </div>
+
+            <div style="
+              display:flex;
+              flex-direction:column;
+              font-size:16px;
+              font-weight:900;
+              color:#111827;
+              border-top:1px solid #d9e3e6;
+            ">
+              <div style="display:grid;grid-template-columns:130px 1fr;border-bottom:1px solid #d9e3e6;padding:9px 0;"><div>기본 이사비용</div><div>${baseCostText}만원</div></div>
+              <div style="display:grid;grid-template-columns:130px 1fr;border-bottom:1px solid #d9e3e6;padding:9px 0;"><div>옵션비용</div><div>${optionCostText}만원</div></div>
+              <div style="display:grid;grid-template-columns:130px 1fr;border-bottom:1px solid #d9e3e6;padding:9px 0;"><div>사다리차비용</div><div>${ladderCostText}만원</div></div>
+              <div style="display:grid;grid-template-columns:130px 1fr;padding:9px 0;"><div>총 합계</div><div>${totalCostText}만원</div></div>
+            </div>
+          </div>
           </div>
 
-          <div style="border:2px solid #d1d5db;border-radius:18px;padding:20px;background:#ffffff;min-height:170px;">
-            <div style="font-size:24px;font-weight:900;color:#0f766e;margin-bottom:16px;">요청사항</div>
-            <div style="white-space:pre-wrap;line-height:1.9;font-size:17px;font-weight:800;">${customerMemo || '-'}</div>
-          </div>
-        </div>
+          <div>
+            ${sectionTitleHtml('/icon-bank.png', '계약금 입금 계좌')}
+            <div style="
+              background:#ffffff;
+              padding:0;
+              overflow:visible;
+            ">
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;position:relative;z-index:1;">
-          <div style="border:2px solid #99f6e4;border-radius:18px;padding:24px;background:#f0fdfa;">
-            <div style="font-size:26px;font-weight:900;color:#0f766e;margin-bottom:16px;">견적 금액</div>
-            <div style="font-size:52px;font-weight:900;color:#14b8a6;margin-bottom:10px;">${totalCost.toLocaleString()}만원</div>
-            <div style="font-size:17px;color:#111827;font-weight:900;">기본비용 ${baseCost || 0}만원 / 옵션 ${optionCost || 0}만원 / 사다리차 ${ladderCost || 0}만원</div>
-            <div style="margin-top:10px;font-size:15px;color:#dc2626;font-weight:900;">※ 카드결제 및 현금영수증 발행 시 부가세 별도</div>
-          </div>
+            <div style="
+              border:1px solid #d9e3e6;
+              border-radius:8px;
+              overflow:hidden;
+              font-size:18px;
+              font-weight:900;
+              color:#111827;
+              line-height:1.7;
+            ">
+              <div style="display:grid;grid-template-columns:110px 1fr;border-bottom:1px solid #d9e3e6;min-height:44px;"><div style="display:flex;align-items:center;padding:8px 12px;color:#0f766e;border-right:1px solid #d9e3e6;background:#fbffff;">은행</div><div style="display:flex;align-items:center;padding:8px 14px;">${escapeHtml(bankName)}</div></div>
+              <div style="display:grid;grid-template-columns:110px 1fr;border-bottom:1px solid #d9e3e6;min-height:44px;"><div style="display:flex;align-items:center;padding:8px 12px;color:#0f766e;border-right:1px solid #d9e3e6;background:#fbffff;">계좌번호</div><div style="display:flex;align-items:center;padding:8px 14px;">${escapeHtml(accountNumber)}</div></div>
+              <div style="display:grid;grid-template-columns:110px 1fr;border-bottom:1px solid #d9e3e6;min-height:44px;"><div style="display:flex;align-items:center;padding:8px 12px;color:#0f766e;border-right:1px solid #d9e3e6;background:#fbffff;">예금주</div><div style="display:flex;align-items:center;padding:8px 14px;">${escapeHtml(accountHolder)}</div></div>
+              <div style="display:grid;grid-template-columns:110px 1fr;min-height:44px;"><div style="display:flex;align-items:center;padding:8px 12px;color:#0f766e;border-right:1px solid #d9e3e6;background:#fbffff;">계약금</div><div style="display:flex;align-items:center;padding:8px 14px;">${depositCostText}만원</div></div>
+            </div>
 
-          <div style="border:2px solid #99f6e4;border-radius:18px;padding:24px;background:#ffffff;">
-            <div style="font-size:26px;font-weight:900;color:#0f766e;margin-bottom:16px;">계약금 입금 계좌</div>
-            <div style="line-height:2.15;font-size:20px;font-weight:900;">
-              <div><strong>은행</strong> : ${bankName}</div>
-              <div><strong>계좌번호</strong> : ${accountNumber}</div>
-              <div><strong>예금주</strong> : ${accountHolder}</div>
-              <div><strong>계약금</strong> : ${depositCost || 0}만원</div>
+            <div style="
+              margin-top:12px;
+              font-size:14px;
+              font-weight:900;
+              color:#dc2626;
+            ">
+              ※ 카드 결제 및 현금영수증 발행 시 부가세 별도
             </div>
           </div>
         </div>
 
-        <div style="margin-top:26px;padding:20px;border-radius:18px;background:#f9fafb;border:1px solid #d1d5db;line-height:2;font-size:16px;font-weight:800;position:relative;z-index:1;">
-          <div style="font-size:22px;font-weight:900;color:#0f766e;margin-bottom:12px;">유의사항</div>
-          <div>• 이사 당일 추가 인원 및 차량 요청 시 추가 비용이 발생할 수 있습니다.</div>
-          <div>• 일정 변경 및 취소는 최소 2일 전까지 연락 부탁드립니다.</div>
-          <div>• 귀중품 및 현금은 고객님께서 직접 보관 부탁드립니다.</div>
+
+        <div style="position:relative;z-index:1;margin-bottom:20px;">
+          ${smallSectionTitleHtml('/icon-terms.png', '계약 조건 및 특약 사항')}
+          <div style="
+            border:1px solid #d1d5db;
+            border-radius:10px;
+            background:#fafafa;
+            padding:16px 18px;
+            box-sizing:border-box;
+          ">
+            <div style="
+              display:flex;
+              flex-direction:column;
+              gap:8px;
+              font-size:11.5px;
+              font-weight:500;
+              line-height:1.65;
+              color:#111827;
+              word-break:break-word;
+            ">
+              <div>• 이사 당일 추가 짐 또는 차량이 추가로 필요 시 비용이 발생할 수 있습니다.</div>
+              <div>• 고객 사정으로 인한 일정 변경 및 취소는 최소 3일 전까지 연락 주세요.</div>
+              <div>• 귀중품 및 현금은 고객님이 직접 관리해 주시기 바랍니다.</div>
+              <div>• 계약서 작성 후 계약금을 입금하시면 예약이 확정됩니다.</div>
+              <div>• 잔금은 이사가 끝나고 고객 확인 후 지불해 주시면 됩니다.</div>
+              <div>• 본 계약서는 쌍방 합의하에 작성되었으며, 계약 내용을 성실히 이행할 것을 약정합니다.</div>
+            </div>
+          </div>
         </div>
 
-        <div style="margin:30px -42px 0 -42px;background:#0f9f9a;color:#ffffff;padding:18px 42px;display:flex;justify-content:space-between;align-items:center;font-size:17px;font-weight:900;">
-          <div>♡ 고객님의 만족이 저희의 가장 큰 기쁨입니다. 항상 최선을 다하는 두근두근 이사가 되겠습니다.</div>
-          <div style="font-size:28px;font-weight:900;letter-spacing:4px;">감사합니다 ♡</div>
+        <div style="position:relative;z-index:1;margin-bottom:26px;">
+          ${smallSectionTitleHtml('/icon-moving-day.png', '이사당일 준비사항')}
+          <div style="
+            border:1px solid #d1d5db;
+            border-radius:10px;
+            background:#ffffff;
+            padding:16px 18px;
+            box-sizing:border-box;
+          ">
+            <div style="
+              display:flex;
+              flex-direction:column;
+              gap:8px;
+              font-size:11.5px;
+              font-weight:500;
+              line-height:1.7;
+              color:#111827;
+              word-break:break-word;
+            ">
+              <div>• 고객님 이사 시작 전 차키, 핸드폰, 지갑, 서류, 귀중품 등은 미리 챙겨 주세요.</div>
+              <div>• 생활 쓰레기, 버릴 음식물, 재활용품은 가능하면 미리 처리해 주세요.</div>
+              <div>• 두고 가야 할 물건이 있으면 미리 말씀해 주세요.</div>
+              <div>• 포장 완료 후 집 안에 두고 가는 물건이 없는지 꼭 확인해 주세요.</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin:0 -40px 0 -40px;">
+          <img
+            src="/footer-message.png"
+            alt="감사 문구"
+            style="
+              width:100%;
+              height:auto;
+              display:block;
+            "
+          />
         </div>
       </div>
     `
@@ -513,17 +844,20 @@ END:VCALENDAR`
   }
 
   const handleImageDownload = async () => {
-    setPdfStatus('텍스트 이미지 생성 중입니다. 잠시만 기다려 주세요.')
+    setPdfStatus('이미지 파일 생성 중입니다. 잠시만 기다려 주세요.')
     let imageTarget = null
 
     try {
       if (document.fonts?.ready) await document.fonts.ready
+
       imageTarget = buildStyledContractElement()
+      await waitForImagesInElement(imageTarget)
 
       const canvas = await html2canvas(imageTarget, {
         scale: 2,
         backgroundColor: '#ffffff',
         useCORS: true,
+        allowTaint: true,
       })
 
       const image = canvas.toDataURL('image/png')
@@ -531,45 +865,62 @@ END:VCALENDAR`
       link.href = image
       link.download = `${customerName || '고객'}_이사계약서.png`
       link.click()
-      setPdfStatus('텍스트 이미지 파일이 생성되었습니다.')
+
+      setPdfStatus('이미지 파일이 생성되었습니다.')
     } catch (error) {
       console.error('이미지 생성 오류:', error)
-      setPdfStatus('이미지 생성에 실패했습니다. 새로고침 후 다시 시도해 주세요.')
+      setPdfStatus('이미지 저장에 실패했습니다. public 폴더의 header-logo.png 파일과 아이콘 파일을 확인해 주세요.')
     } finally {
       if (imageTarget) imageTarget.remove()
     }
   }
 
   const handlePdfDownload = async () => {
-    setPdfStatus('텍스트 계약서 PDF 생성 중입니다. 잠시만 기다려 주세요.')
+    setPdfStatus('PDF 파일 생성 중입니다. 잠시만 기다려 주세요.')
     let result = null
 
     try {
       if (document.fonts?.ready) await document.fonts.ready
+
       result = buildTextContractPages()
+      const page = result.pages[0]
+
+      await waitForImagesInElement(page)
+
+      const canvas = await html2canvas(page, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        allowTaint: true,
+      })
 
       const pdf = new jsPDF('p', 'mm', 'a4')
       const pageWidth = pdf.internal.pageSize.getWidth()
       const pageHeight = pdf.internal.pageSize.getHeight()
 
-      for (let i = 0; i < result.pages.length; i += 1) {
-        const canvas = await html2canvas(result.pages[i], {
-          scale: 2,
-          backgroundColor: '#ffffff',
-          useCORS: true,
-        })
+      const margin = 6
+      const maxWidth = pageWidth - margin * 2
+      const maxHeight = pageHeight - margin * 2
 
-        const imgData = canvas.toDataURL('image/jpeg', 0.95)
+      let renderWidth = maxWidth
+      let renderHeight = (canvas.height * renderWidth) / canvas.width
 
-        if (i > 0) pdf.addPage()
-        pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight)
+      if (renderHeight > maxHeight) {
+        renderHeight = maxHeight
+        renderWidth = (canvas.width * renderHeight) / canvas.height
       }
 
+      const imgData = canvas.toDataURL('image/png')
+      const x = (pageWidth - renderWidth) / 2
+      const y = (pageHeight - renderHeight) / 2
+
+      pdf.addImage(imgData, 'PNG', x, y, renderWidth, renderHeight)
       pdf.save(`${customerName || '고객'}_이사계약서.pdf`)
-      setPdfStatus('텍스트 계약서 PDF 파일이 생성되었습니다.')
+
+      setPdfStatus('PDF 파일이 생성되었습니다.')
     } catch (error) {
       console.error('PDF 생성 오류:', error)
-      setPdfStatus('PDF 생성에 실패했습니다. 새로고침 후 다시 시도해 주세요.')
+      setPdfStatus('PDF 저장에 실패했습니다. public 폴더의 header-logo.png 파일과 아이콘 파일을 확인해 주세요.')
     } finally {
       if (result?.wrapper) result.wrapper.remove()
     }
@@ -847,13 +1198,13 @@ END:VCALENDAR`
         <section style={styles.section}>
           <h2 style={styles.sectionTitle}>계약 상품</h2>
           <div style={{ ...styles.grid2, fontSize: 16, fontWeight: 700 }}>
-            <label><input type="checkbox" onChange={() => toggleValue('포장이사', setMoveTypes)} /> 포장이사</label>
-            <label><input type="checkbox" onChange={() => toggleValue('일반이사', setMoveTypes)} /> 일반이사</label>
-            <label><input type="checkbox" onChange={() => toggleValue('반포장이사', setMoveTypes)} /> 반포장이사</label>
-            <label><input type="checkbox" onChange={() => toggleValue('사무실이사', setMoveTypes)} /> 사무실이사</label>
+            <label><input type="checkbox" checked={moveTypes.includes('포장이사')} onChange={() => toggleValue('포장이사', setMoveTypes)} /> 포장이사</label>
+            <label><input type="checkbox" checked={moveTypes.includes('일반이사')} onChange={() => toggleValue('일반이사', setMoveTypes)} /> 일반이사</label>
+            <label><input type="checkbox" checked={moveTypes.includes('반포장이사')} onChange={() => toggleValue('반포장이사', setMoveTypes)} /> 반포장이사</label>
+            <label><input type="checkbox" checked={moveTypes.includes('사무실이사')} onChange={() => toggleValue('사무실이사', setMoveTypes)} /> 사무실이사</label>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontWeight: 700 }}>
-            <label><input type="checkbox" onChange={() => toggleValue('보관이사', setMoveTypes)} /> 보관이사</label>
+            <label><input type="checkbox" checked={moveTypes.includes('보관이사')} onChange={() => toggleValue('보관이사', setMoveTypes)} /> 보관이사</label>
             <select value={storageDays} onChange={(e) => setStorageDays(e.target.value)} style={{ ...styles.input, width: 120 }}>
               {Array.from({ length: 365 }, (_, i) => <option key={i + 1}>{i + 1}일</option>)}
             </select>
@@ -861,11 +1212,11 @@ END:VCALENDAR`
 
           <h3 style={{ fontSize: 16, fontWeight: 800, color: '#111827' }}>주거 형태</h3>
           <div style={{ ...styles.grid2, fontSize: 16, fontWeight: 700 }}>
-            <label><input type="checkbox" onChange={() => toggleValue('아파트', setHouseTypes)} /> 아파트</label>
-            <label><input type="checkbox" onChange={() => toggleValue('빌라', setHouseTypes)} /> 빌라</label>
-            <label><input type="checkbox" onChange={() => toggleValue('오피스텔/원룸', setHouseTypes)} /> 오피스텔/원룸</label>
-            <label><input type="checkbox" onChange={() => toggleValue('다세대/단독', setHouseTypes)} /> 다세대/단독</label>
-            <label><input type="checkbox" onChange={() => toggleValue('상가', setHouseTypes)} /> 상가</label>
+            <label><input type="checkbox" checked={houseTypes.includes('아파트')} onChange={() => toggleValue('아파트', setHouseTypes)} /> 아파트</label>
+            <label><input type="checkbox" checked={houseTypes.includes('빌라')} onChange={() => toggleValue('빌라', setHouseTypes)} /> 빌라</label>
+            <label><input type="checkbox" checked={houseTypes.includes('오피스텔/원룸')} onChange={() => toggleValue('오피스텔/원룸', setHouseTypes)} /> 오피스텔/원룸</label>
+            <label><input type="checkbox" checked={houseTypes.includes('다세대/단독')} onChange={() => toggleValue('다세대/단독', setHouseTypes)} /> 다세대/단독</label>
+            <label><input type="checkbox" checked={houseTypes.includes('상가')} onChange={() => toggleValue('상가', setHouseTypes)} /> 상가</label>
           </div>
 
           <Field label="작업 용량">
