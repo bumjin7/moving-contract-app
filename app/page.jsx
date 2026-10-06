@@ -199,6 +199,11 @@ const ADMIN_PASSWORD = '8210'
 export default function MovingContractApp() {
   const contractRef = useRef(null)
 
+  const companyName = '두근두근이사'
+  const representativeName = '윤도근'
+  const businessRegistrationNumber = '542-05-00552'
+  const companyPhone = '010-9889-6697'
+
   const bankName = '농협'
   const accountNumber = '352-1025-5721-13'
   const accountHolder = '윤도근'
@@ -759,6 +764,18 @@ END:VCALENDAR`
               color:#dc2626;
             ">
               ※ 카드 결제 및 현금영수증 발행 시 부가세 별도
+            </div>
+
+            <div style="
+              margin-top:14px;
+              font-size:11px;
+              font-weight:500;
+              color:#6b7280;
+              line-height:1.8;
+              text-align:right;
+            ">
+              <div style="white-space:nowrap;"><strong>업체명:</strong> ${escapeHtml(companyName)} &nbsp;|&nbsp; <strong>대표자:</strong> ${escapeHtml(representativeName)}</div>
+              <div style="white-space:nowrap;"><strong>사업자등록번호:</strong> ${escapeHtml(businessRegistrationNumber)} &nbsp;|&nbsp; <strong>대표번호:</strong> ${escapeHtml(companyPhone)}</div>
             </div>
           </div>
         </div>
