@@ -766,17 +766,7 @@ END:VCALENDAR`
               ※ 카드 결제 및 현금영수증 발행 시 부가세 별도
             </div>
 
-            <div style="
-              margin-top:14px;
-              font-size:11px;
-              font-weight:500;
-              color:#6b7280;
-              line-height:1.8;
-              text-align:right;
-            ">
-              <div style="white-space:nowrap;"><strong>업체명:</strong> ${escapeHtml(companyName)} &nbsp;|&nbsp; <strong>대표자:</strong> ${escapeHtml(representativeName)}</div>
-              <div style="white-space:nowrap;"><strong>사업자등록번호:</strong> ${escapeHtml(businessRegistrationNumber)} &nbsp;|&nbsp; <strong>대표번호:</strong> ${escapeHtml(companyPhone)}</div>
-            </div>
+
           </div>
         </div>
 
@@ -835,6 +825,21 @@ END:VCALENDAR`
               <div>• 포장 완료 후 집 안에 두고 가는 물건이 없는지 꼭 확인해 주세요.</div>
             </div>
           </div>
+        </div>
+
+        <div style="
+          position:relative;
+          z-index:1;
+          margin-top:-12px;
+          margin-bottom:20px;
+          font-size:11px;
+          font-weight:500;
+          color:#6b7280;
+          line-height:1.8;
+          text-align:left;
+        ">
+          <div><strong>사업자등록번호:</strong> ${escapeHtml(businessRegistrationNumber)} &nbsp;|&nbsp; <strong>대표자:</strong> ${escapeHtml(representativeName)}</div>
+          <div><strong>상호명:</strong> ${escapeHtml(companyName)} &nbsp;|&nbsp; <strong>대표번호:</strong> ${escapeHtml(companyPhone)}</div>
         </div>
 
         <div style="margin:0 -40px 0 -40px;">
